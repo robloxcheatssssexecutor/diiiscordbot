@@ -47,7 +47,8 @@ const PANEL_LOGO_URL = "https://i.imgur.com/Nuy61wA.png";
 const PAYMENT_METHODS = [
   { id: "paypal", label: "Paypal", emoji: "💳" },
   { id: "litecoin", label: "Litecoin", emoji: "🪙" },
-  { id: "bitcoin", label: "Bitcoin", emoji: "₿" },
+  // Note: "₿" (bitcoin sign) is not a valid Discord emoji for components.
+  { id: "bitcoin", label: "Bitcoin", emoji: "🟠" },
   { id: "solana", label: "Solana", emoji: "🌞" },
   { id: "othercrypto", label: "Other Crypto", emoji: "🧩" },
   { id: "stripe", label: "Stripe", emoji: "🏦" },
@@ -1225,9 +1226,15 @@ client.on("interactionCreate", async (interaction) => {
     await ticketChannel.send({ embeds: [ticketEmbed], components: [closeRow] });
 
     if (ticketCustomId === "ticket_open_buy") {
-      const paymentButtons = PAYMENT_METHODS.map((method) =>
-        new ButtonBuilder().setCustomId(`buy_pay_${method.id}`).setLabel(method.label).setEmoji(method.emoji).setStyle(ButtonStyle.Secondary)
-      );
+      // Component emojis are strict and can error with some unicode symbols.
+      // Keep the UX by embedding the symbol into the label instead.
+      const paymentButtons = PAYMENT_METHODS.map((method) => {
+        const safeLabel = method.emoji ? `${method.emoji} ${method.label}` : method.label;
+        return new ButtonBuilder()
+          .setCustomId(`buy_pay_${method.id}`)
+          .setLabel(safeLabel.slice(0, 80))
+          .setStyle(ButtonStyle.Secondary);
+      });
       const row1 = new ActionRowBuilder().addComponents(paymentButtons.slice(0, 4));
       const row2 = new ActionRowBuilder().addComponents(paymentButtons.slice(4, 8));
       const buyEmbed = new EmbedBuilder()
