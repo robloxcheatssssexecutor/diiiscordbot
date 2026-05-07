@@ -119,6 +119,14 @@ function statusEmoji(status) {
   }
 }
 
+function daysRemaining(expiresAt) {
+  if (!expiresAt) return null;
+  const expiresMs = new Date(expiresAt).getTime();
+  if (Number.isNaN(expiresMs)) return null;
+  const diff = expiresMs - Date.now();
+  return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+}
+
 const app = express();
 app.use(express.json());
 
@@ -339,35 +347,46 @@ client.on("messageCreate", async (message) => {
       await message.reply("No hay keys guardadas.");
       return;
     }
-    const pageSize = 8;
-    for (let start = 0; start < db.keys.length; start += pageSize) {
-      const chunk = db.keys.slice(start, start + pageSize);
-      const embed = new EmbedBuilder()
-        .setColor(0xff8a33)
-        .setTitle("Falcão External • Keylist")
-        .setDescription(`Mostrando **${start + 1}-${start + chunk.length}** de **${db.keys.length}** keys`)
-        .setFooter({
-          text: `Página ${Math.floor(start / pageSize) + 1}/${Math.ceil(db.keys.length / pageSize)}`
-        })
-        .setTimestamp(new Date());
+    const sorted = [...db.keys].sort((a, b) => {
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
+      return tb - ta;
+    });
 
-      for (const k of chunk) {
-        const title = `${statusEmoji(k.status)} ${truncateCell(k.key, 45)}`;
-        const value = [
-          `**Estado:** ${k.status || "-"}`,
-          `**Duración:** ${k.durationDays ?? "-"} días`,
-          `**HWID:** \`${truncateCell(k.hwid || "-", 50)}\``,
-          `**IP:** \`${truncateCell(k.ip || "-", 30)}\``,
-          `**Creada:** ${formatDate(k.createdAt)}`,
-          `**Expira:** ${formatDate(k.expiresAt)}`,
-          `**First login:** ${formatDate(k.firstLoginAt)}`
-        ].join("\n");
+    const blocks = sorted.map((k) => {
+      const left = daysRemaining(k.expiresAt);
+      const remainLine =
+        left === null
+          ? "TIEMPO RESTANTE: -"
+          : `TIEMPO RESTANTE: ${left} DIA${left === 1 ? "" : "S"}`;
 
-        embed.addFields({ name: title, value, inline: true });
-      }
+      return [
+        `${statusEmoji(k.status)} **${k.key}**`,
+        `Estado: ${k.status || "-"}`,
+        `Duración: ${k.durationDays ?? "-"} días`,
+        `${remainLine}`,
+        `HWID: \`${truncateCell(k.hwid || "-", 70)}\``,
+        `IP: \`${truncateCell(k.ip || "-", 45)}\``,
+        `Creada: ${formatDate(k.createdAt)}`,
+        `Expira: ${formatDate(k.expiresAt)}`,
+        `First login: ${formatDate(k.firstLoginAt)}`
+      ].join("\n");
+    });
 
-      await message.reply({ embeds: [embed] });
+    const separator = "\n------------------------------\n";
+    let description = blocks.join(separator);
+    if (description.length > 3900) {
+      description = `${description.slice(0, 3850)}\n\n... (lista recortada por límite de Discord)`;
     }
+
+    const embed = new EmbedBuilder()
+      .setColor(0xff8a33)
+      .setTitle("Falcão External • Keylist")
+      .setDescription(`Mostrando 1-${db.keys.length} de ${db.keys.length} keys\n\n${description}`)
+      .setFooter({ text: `Total: ${db.keys.length} keys` })
+      .setTimestamp(new Date());
+
+    await message.reply({ embeds: [embed] });
     return;
   }
 
