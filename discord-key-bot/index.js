@@ -31,6 +31,27 @@ if (!TOKEN) {
 
 const dataDir = path.join(__dirname, "data");
 const dbPath = path.join(dataDir, "keys.json");
+const pricesPath = path.join(dataDir, "prices.json");
+const BRAND_ORANGE = 0xff8a33;
+
+const PAYMENT_METHODS = [
+  { id: "paypal", label: "Paypal", emoji: "💳" },
+  { id: "litecoin", label: "Litecoin", emoji: "🪙" },
+  { id: "bitcoin", label: "Bitcoin", emoji: "₿" },
+  { id: "solana", label: "Solana", emoji: "🌞" },
+  { id: "othercrypto", label: "Other Crypto", emoji: "🧩" },
+  { id: "stripe", label: "Stripe", emoji: "🏦" },
+  { id: "bizum", label: "Bizum", emoji: "📱" },
+  { id: "otherpay", label: "Otro metodo de pago", emoji: "💰" }
+];
+
+const LICENSE_TIMES = [
+  { id: "1w", label: "1 Week" },
+  { id: "1m", label: "1 Month" },
+  { id: "3m", label: "3 Month" },
+  { id: "life", label: "Lifetime" },
+  { id: "custom", label: "Custom Time" }
+];
 
 function ensureDb() {
   if (!fs.existsSync(dataDir)) {
@@ -39,6 +60,39 @@ function ensureDb() {
   if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, JSON.stringify({ keys: [] }, null, 2), "utf8");
   }
+}
+
+function randomPrice(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function defaultPriceTable() {
+  return {
+    "1w": randomPrice(8, 15),
+    "1m": randomPrice(18, 35),
+    "3m": randomPrice(35, 70),
+    life: randomPrice(80, 180),
+    custom: randomPrice(25, 120)
+  };
+}
+
+function ensurePrices() {
+  ensureDb();
+  if (!fs.existsSync(pricesPath)) {
+    fs.writeFileSync(pricesPath, JSON.stringify(defaultPriceTable(), null, 2), "utf8");
+  }
+}
+
+function readPrices() {
+  ensurePrices();
+  const parsed = JSON.parse(fs.readFileSync(pricesPath, "utf8"));
+  const merged = { ...defaultPriceTable(), ...parsed };
+  return merged;
+}
+
+function writePrices(prices) {
+  ensurePrices();
+  fs.writeFileSync(pricesPath, JSON.stringify(prices, null, 2), "utf8");
 }
 
 function readDb() {
@@ -69,12 +123,12 @@ async function sendLogEmbed(clientInstance, channelId, embed) {
   }
 }
 
-function baseLogEmbed(title, color = 0x4a90e2) {
+function baseLogEmbed(title, color = BRAND_ORANGE) {
   return new EmbedBuilder().setColor(color).setTitle(title).setTimestamp(new Date());
 }
 
 async function logGeneral(clientInstance, title, fields = []) {
-  const embed = baseLogEmbed(title, 0x4a90e2).addFields(fields);
+  const embed = baseLogEmbed(title, BRAND_ORANGE).addFields(fields);
   await sendLogEmbed(clientInstance, LOG_CHANNEL_GENERAL_ID, embed);
 }
 
@@ -143,6 +197,7 @@ const TICKET_TYPES = {
     channelPrefix: "bug"
   }
 };
+const buySelections = new Map();
 
 function randomAlphaNum(length) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -401,6 +456,8 @@ client.on("messageCreate", async (message) => {
         "",
         "**Comandos de admin (rol requerido):**",
         "`!ticketpanel` -> Publica el panel profesional de tickets.",
+        "`!tablaprecios` -> Muestra la tabla de precios actual.",
+        "`!tablaprecios set <tiempo> <precio>` -> Edita precio (tiempos: 1w, 1m, 3m, life, custom).",
         "`!keygen <duracion_en_dias>` -> Genera 1 key con formato FALCAO-EXTERNAL-XXXXX-XXXXX.",
         "`!keylist` -> Tabla con todas las keys y datos (estado, HWID, IP, fechas).",
         "`!keycheck <key>` -> Muestra todos los datos de una key.",
@@ -435,10 +492,11 @@ client.on("messageCreate", async (message) => {
   ]);
 
   const db = readDb();
+  const prices = readPrices();
 
   if (command === "ticketpanel") {
     const panelEmbed = new EmbedBuilder()
-      .setColor(0x2b2d31)
+      .setColor(BRAND_ORANGE)
       .setTitle("Falcão External • Ticket Center")
       .setDescription(
         [
@@ -467,6 +525,46 @@ client.on("messageCreate", async (message) => {
     await logGeneral(client, "Panel de tickets publicado", [
       { name: "Usuario", value: `${message.author.tag} (${message.author.id})`, inline: false },
       { name: "Canal", value: `<#${message.channel.id}>`, inline: true }
+    ]);
+    return;
+  }
+
+  if (command === "tablaprecios") {
+    if (!args.length) {
+      const lines = LICENSE_TIMES.map((t) => `- **${t.label}** (\`${t.id}\`): **${prices[t.id]}€**`);
+      const embed = new EmbedBuilder()
+        .setColor(BRAND_ORANGE)
+        .setTitle("Falcão External • Tabla de precios")
+        .setDescription(lines.join("\n"))
+        .setFooter({ text: `Para editar: ${PREFIX}tablaprecios set <tiempo> <precio>` })
+        .setTimestamp(new Date());
+      await message.reply({ embeds: [embed] });
+      return;
+    }
+
+    if (args[0].toLowerCase() !== "set" || args.length < 3) {
+      await message.reply(`Uso: \`${PREFIX}tablaprecios set <tiempo> <precio>\` (tiempos: 1w, 1m, 3m, life, custom).`);
+      return;
+    }
+
+    const timeKey = args[1].toLowerCase();
+    const amount = Number(args[2]);
+    if (!LICENSE_TIMES.some((t) => t.id === timeKey)) {
+      await message.reply("Tiempo inválido. Usa: `1w`, `1m`, `3m`, `life`, `custom`.");
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      await message.reply("Precio inválido. Debe ser un número mayor a 0.");
+      return;
+    }
+
+    prices[timeKey] = Number(amount.toFixed(2));
+    writePrices(prices);
+    await message.reply(`Precio actualizado: \`${timeKey}\` -> **${prices[timeKey]}€**`);
+    await logGeneral(client, "Tabla de precios actualizada", [
+      { name: "Usuario", value: `${message.author.tag} (${message.author.id})`, inline: false },
+      { name: "Tiempo", value: timeKey, inline: true },
+      { name: "Precio", value: `${prices[timeKey]}€`, inline: true }
     ]);
     return;
   }
@@ -513,7 +611,7 @@ client.on("messageCreate", async (message) => {
     await sendLogEmbed(
       client,
       LOG_CHANNEL_KEYGEN_ID,
-      baseLogEmbed("Uso de !keygen", 0x57f287).addFields([
+      baseLogEmbed("Uso de !keygen", BRAND_ORANGE).addFields([
         { name: "Usuario", value: `${message.author.tag} (${message.author.id})`, inline: false },
         { name: "Duración", value: `${days} días`, inline: true },
         { name: "Key", value: `\`${record.key}\``, inline: false }
@@ -643,7 +741,7 @@ client.on("messageCreate", async (message) => {
     await sendLogEmbed(
       client,
       LOG_CHANNEL_RESETHWID_ID,
-      baseLogEmbed("Uso de !resethwid", 0xfee75c).addFields([
+      baseLogEmbed("Uso de !resethwid", BRAND_ORANGE).addFields([
         { name: "Usuario", value: `${message.author.tag} (${message.author.id})`, inline: false },
         { name: "Key", value: `\`${key}\``, inline: false },
         { name: "Canal", value: `<#${message.channel.id}>`, inline: true }
@@ -736,13 +834,24 @@ client.on("interactionCreate", async (interaction) => {
         .setStyle(ButtonStyle.Danger)
     );
 
+    let introText = "Explica tu solicitud con detalles para que el staff pueda ayudarte rápidamente.";
+    if (interaction.customId === "ticket_open_bug") {
+      introText = "Describe el bug: qué pasó, pasos para reproducirlo, y si puedes adjunta capturas/video.";
+    } else if (interaction.customId === "ticket_open_support") {
+      introText = "Indica qué problema tienes o qué necesitas para que el soporte te ayude de forma precisa.";
+    } else if (interaction.customId === "ticket_open_hwid") {
+      introText = "Escribe tu key y por qué necesitas el HWID reset.";
+    } else if (interaction.customId === "ticket_open_buy") {
+      introText = "Selecciona primero el método de pago, luego el tiempo de licencia.";
+    }
+
     const ticketEmbed = new EmbedBuilder()
-      .setColor(0x5865f2)
+      .setColor(BRAND_ORANGE)
       .setTitle(`${typeData.emoji} Ticket • ${typeData.label}`)
       .setDescription(
         [
           `${interaction.user}, tu ticket fue creado correctamente.`,
-          "Explica tu solicitud con detalles para que el staff pueda ayudarte rápidamente.",
+          introText,
           "",
           "Cuando termine, pulsa **Cerrar ticket** para generar transcript automático."
         ].join("\n")
@@ -751,12 +860,115 @@ client.on("interactionCreate", async (interaction) => {
       .setTimestamp(new Date());
 
     await ticketChannel.send({ embeds: [ticketEmbed], components: [closeRow] });
+
+    if (interaction.customId === "ticket_open_buy") {
+      const paymentButtons = PAYMENT_METHODS.map((method) =>
+        new ButtonBuilder()
+          .setCustomId(`buy_pay_${method.id}`)
+          .setLabel(method.label)
+          .setEmoji(method.emoji)
+          .setStyle(ButtonStyle.Secondary)
+      );
+      const row1 = new ActionRowBuilder().addComponents(paymentButtons.slice(0, 4));
+      const row2 = new ActionRowBuilder().addComponents(paymentButtons.slice(4, 8));
+
+      const buyEmbed = new EmbedBuilder()
+        .setColor(BRAND_ORANGE)
+        .setTitle("🛒 Buy • Método de pago")
+        .setDescription("Elige cómo quieres pagar la licencia.")
+        .setTimestamp(new Date());
+
+      await ticketChannel.send({ embeds: [buyEmbed], components: [row1, row2] });
+    }
+
     await interaction.reply({ content: `Ticket creado: <#${ticketChannel.id}>`, ephemeral: true });
 
     await logGeneral(client, "Ticket abierto", [
       { name: "Usuario", value: `${interaction.user.tag} (${interaction.user.id})`, inline: false },
       { name: "Tipo", value: typeData.label, inline: true },
       { name: "Canal", value: `<#${ticketChannel.id}>`, inline: true }
+    ]);
+    return;
+  }
+
+  if (interaction.customId.startsWith("buy_pay_")) {
+    const methodId = interaction.customId.replace("buy_pay_", "");
+    const method = PAYMENT_METHODS.find((m) => m.id === methodId);
+    if (!method) {
+      await interaction.reply({ content: "Método de pago inválido.", ephemeral: true });
+      return;
+    }
+
+    const ownerMatch = /user:(\d+)/.exec(interaction.channel?.topic || "");
+    const ownerId = ownerMatch ? ownerMatch[1] : "";
+    const allowed = hasRequiredRole(interaction.member) || interaction.user.id === ownerId;
+    if (!allowed) {
+      await interaction.reply({ content: "Solo el owner o staff puede usar esta opción.", ephemeral: true });
+      return;
+    }
+
+    buySelections.set(interaction.channel.id, { methodId });
+    const timeButtons = LICENSE_TIMES.map((t) =>
+      new ButtonBuilder()
+        .setCustomId(`buy_time_${t.id}`)
+        .setLabel(t.label)
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    const rowA = new ActionRowBuilder().addComponents(timeButtons.slice(0, 3));
+    const rowB = new ActionRowBuilder().addComponents(timeButtons.slice(3, 5));
+    const timeEmbed = new EmbedBuilder()
+      .setColor(BRAND_ORANGE)
+      .setTitle("🕒 Buy • Tiempo de licencia")
+      .setDescription(`${method.emoji} Método seleccionado: **${method.label}**\nAhora elige el tiempo de la licencia.`)
+      .setTimestamp(new Date());
+
+    await interaction.reply({ embeds: [timeEmbed], components: [rowA, rowB] });
+    return;
+  }
+
+  if (interaction.customId.startsWith("buy_time_")) {
+    const timeId = interaction.customId.replace("buy_time_", "");
+    const timeInfo = LICENSE_TIMES.find((t) => t.id === timeId);
+    if (!timeInfo) {
+      await interaction.reply({ content: "Tiempo inválido.", ephemeral: true });
+      return;
+    }
+
+    const ownerMatch = /user:(\d+)/.exec(interaction.channel?.topic || "");
+    const ownerId = ownerMatch ? ownerMatch[1] : "";
+    const allowed = hasRequiredRole(interaction.member) || interaction.user.id === ownerId;
+    if (!allowed) {
+      await interaction.reply({ content: "Solo el owner o staff puede usar esta opción.", ephemeral: true });
+      return;
+    }
+
+    const methodInfo = buySelections.get(interaction.channel.id);
+    const method = PAYMENT_METHODS.find((m) => m.id === methodInfo?.methodId) || { label: "No seleccionado", emoji: "❔" };
+    const livePrices = readPrices();
+    const amount = livePrices[timeId];
+
+    const resultEmbed = new EmbedBuilder()
+      .setColor(BRAND_ORANGE)
+      .setTitle("✅ Buy • Selección completada")
+      .setDescription(
+        [
+          `**Método de pago:** ${method.emoji} ${method.label}`,
+          `**Tiempo:** ${timeInfo.label}`,
+          `**Precio:** ${amount}€`,
+          "",
+          "Staff continuará el proceso de compra en este ticket."
+        ].join("\n")
+      )
+      .setTimestamp(new Date());
+    await interaction.reply({ embeds: [resultEmbed] });
+
+    await logGeneral(client, "Selección de compra en ticket", [
+      { name: "Usuario", value: `${interaction.user.tag} (${interaction.user.id})`, inline: false },
+      { name: "Ticket", value: interaction.channel?.name || "unknown", inline: true },
+      { name: "Pago", value: method.label, inline: true },
+      { name: "Tiempo", value: timeInfo.label, inline: true },
+      { name: "Precio", value: `${amount}€`, inline: true }
     ]);
     return;
   }
@@ -781,7 +993,7 @@ client.on("interactionCreate", async (interaction) => {
     const ownerMatch = /user:(\d+)/.exec(interaction.channel.topic || "");
     const ownerId = ownerMatch ? ownerMatch[1] : "unknown";
 
-    const transcriptEmbed = baseLogEmbed("Transcript de ticket", 0xed4245).addFields([
+    const transcriptEmbed = baseLogEmbed("Transcript de ticket", BRAND_ORANGE).addFields([
       { name: "Ticket", value: ticketName, inline: true },
       { name: "Cerrado por", value: `${interaction.user.tag} (${interaction.user.id})`, inline: false },
       { name: "Owner", value: ownerId, inline: true }
@@ -799,11 +1011,33 @@ client.on("interactionCreate", async (interaction) => {
       console.error("Could not upload transcript:", error.message);
     }
 
+    try {
+      if (ownerId !== "unknown") {
+        const ownerUser = await client.users.fetch(ownerId);
+        const dmEmbed = new EmbedBuilder()
+          .setColor(BRAND_ORANGE)
+          .setTitle("📄 Transcript de tu ticket")
+          .setDescription("Tu ticket fue cerrado. Aquí tienes el transcript completo.")
+          .addFields(
+            { name: "Ticket", value: ticketName, inline: true },
+            { name: "Cerrado por", value: `${interaction.user.tag}`, inline: true }
+          )
+          .setTimestamp(new Date());
+        await ownerUser.send({
+          embeds: [dmEmbed],
+          files: [{ attachment: transcriptBuffer, name: `${ticketName}-transcript.txt` }]
+        });
+      }
+    } catch (error) {
+      console.error("Could not DM transcript to ticket owner:", error.message);
+    }
+
     await logGeneral(client, "Ticket cerrado", [
       { name: "Ticket", value: ticketName, inline: true },
       { name: "Cerrado por", value: `${interaction.user.tag} (${interaction.user.id})`, inline: false }
     ]);
 
+    buySelections.delete(interaction.channel.id);
     await interaction.channel.delete("Ticket closed by button action.");
   }
 });
