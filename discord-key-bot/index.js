@@ -22,6 +22,7 @@ const LOG_CHANNEL_GENERAL_ID = "1502007488533233744";
 const LOG_CHANNEL_KEYGEN_ID = "1502007948497391708";
 const LOG_CHANNEL_RESETHWID_ID = "1502007476076282056";
 const LOG_CHANNEL_TRANSCRIPTS_ID = "1502007473157177507";
+const LOG_CHANNEL_ERRORS_ID = "1502039396978003979";
 const OFFER_CHANNEL_ID = "1502029921629900890";
 const SUGGESTION_CHANNEL_IDS = new Set(["1502035178309161150", "1502007614047785182"]);
 const TICKET_CATEGORY_BUY = "Buy Tickets";
@@ -105,6 +106,16 @@ function ensurePurchases() {
   if (!fs.existsSync(purchasesPath)) {
     fs.writeFileSync(purchasesPath, JSON.stringify({ users: {} }, null, 2), "utf8");
   }
+}
+
+function hashString(input) {
+  const str = String(input || "");
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i += 1) {
+    hash ^= str.charCodeAt(i);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  return (hash >>> 0).toString(16);
 }
 
 function runDataBackup() {
@@ -239,6 +250,30 @@ async function logGeneral(clientInstance, title, fields = []) {
   await sendLogEmbed(clientInstance, LOG_CHANNEL_GENERAL_ID, embed);
 }
 
+async function logError(context, error, extra = {}) {
+  const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const stack = error instanceof Error && error.stack ? error.stack.slice(0, 1500) : "No stack";
+  const fingerprint = hashString(`${context}|${reason}|${stack.slice(0, 400)}`);
+  const errorId = `ERR-${Date.now().toString(36).toUpperCase()}-${fingerprint.slice(0, 6).toUpperCase()}`;
+  const dedupeWindowMs = 30 * 1000;
+  const previous = recentErrorFingerprints.get(fingerprint) || 0;
+  if (Date.now() - previous < dedupeWindowMs) {
+    return;
+  }
+  recentErrorFingerprints.set(fingerprint, Date.now());
+  const fields = [
+    { name: "Error ID", value: errorId, inline: true },
+    { name: "Context", value: String(context).slice(0, 1024), inline: false },
+    { name: "Reason", value: reason.slice(0, 1024), inline: false }
+  ];
+  for (const [k, v] of Object.entries(extra || {})) {
+    fields.push({ name: String(k).slice(0, 256), value: String(v).slice(0, 1024), inline: true });
+  }
+  fields.push({ name: "Stack", value: `\`\`\`${stack}\`\`\``, inline: false });
+  const embed = baseLogEmbed("Bot Error", 0xed4245).addFields(fields);
+  await sendLogEmbed(client, LOG_CHANNEL_ERRORS_ID, embed);
+}
+
 async function ensureTicketCategory(guild, categoryName) {
   const found = guild.channels.cache.find(
     (channel) => channel.type === 4 && channel.name.toLowerCase() === categoryName.toLowerCase()
@@ -307,6 +342,7 @@ const TICKET_TYPES = {
 const buySelections = new Map();
 const buttonCooldowns = new Map();
 const suggestionVotes = new Map();
+const recentErrorFingerprints = new Map();
 
 function isOnCooldown(userId, key, cooldownMs = BUTTON_COOLDOWN_MS) {
   const now = Date.now();
@@ -636,6 +672,7 @@ setInterval(async () => {
     await sendLogEmbed(client, OFFER_CHANNEL_ID, embed);
   } catch (error) {
     console.error("Offer expiry checker failed:", error.message);
+    logError("offer_expiry_interval", error).catch(() => {});
   }
 }, 60 * 1000);
 
@@ -644,6 +681,7 @@ setInterval(() => {
     runDataBackup();
   } catch (error) {
     console.error("Backup job failed:", error.message);
+    logError("backup_interval", error).catch(() => {});
   }
 }, Math.max(1, BACKUP_INTERVAL_HOURS) * 60 * 60 * 1000);
 
@@ -672,6 +710,7 @@ setInterval(async () => {
       await msg.edit({ embeds: [finalEmbed], components: [] });
     } catch (error) {
       console.error("Suggestion finalize failed:", error.message);
+      logError("suggestion_finalize_interval", error, { suggestionMessageId: messageId }).catch(() => {});
     }
   }
 }, 60 * 1000);
@@ -686,34 +725,58 @@ app.listen(API_PORT, () => {
   console.log(`HTTP API online on port ${API_PORT}`);
 });
 
+process.on("unhandledRejection", (reason) => {
+  logError("process.unhandledRejection", reason).catch(() => {});
+});
+
+process.on("uncaughtException", (error) => {
+  logError("process.uncaughtException", error).catch(() => {});
+});
+
 client.login(TOKEN);
 
 client.on("interactionCreate", async (interaction) => {
+  try {
   if (interaction.isChatInputCommand()) {
     const slashCommand = interaction.commandName;
     const publicSlashCommands = new Set(["falcaohelp", "s"]);
     const requiresRole = !publicSlashCommands.has(slashCommand);
     if (requiresRole && !hasRequiredRole(interaction.member)) {
-      await interaction.reply({ content: `Not authorized. You need role <@&${REQUIRED_ROLE_ID}>.`, ephemeral: true });
+      await interaction.reply({ content: `Not authorized. You need role <@&${REQUIRED_ROLE_ID}>.` });
       return;
     }
 
     if (slashCommand === "falcaohelp") {
-      await interaction.reply({
-        content: [
-          "**Slash Commands:**",
-          "`/falcaohelp`",
-          "`/ticketpanel`",
-          "`/tablaprecios`",
-          "`/tablapreciosset`",
-          "`/oferta`",
-          "`/offeroff`",
-          "`/keygen` `/keylist` `/keycheck` `/keydel` `/resethwid`",
-          "`/compraseveryone`",
-          "`/s` (suggestions)"
-        ].join("\n"),
-        ephemeral: true
-      });
+      const helpEmbed = new EmbedBuilder()
+        .setColor(BRAND_ORANGE)
+        .setTitle("FALCAO EXTERNAL • Help")
+        .setThumbnail(PANEL_LOGO_URL)
+        .addFields(
+          {
+            name: "👤 User Commands",
+            value: [
+              "`/falcaohelp`",
+              "`/s`",
+              "Open tickets from the ticket panel buttons"
+            ].join("\n"),
+            inline: false
+          },
+          {
+            name: "🛡️ Admin Commands",
+            value: [
+              "`/ticketpanel`",
+              "`/tablaprecios`",
+              "`/tablapreciosset`",
+              "`/oferta`",
+              "`/offeroff`",
+              "`/keygen` `/keylist` `/keycheck` `/keydel` `/resethwid`",
+              "`/compraseveryone`"
+            ].join("\n"),
+            inline: false
+          }
+        )
+        .setFooter({ text: "Slash commands only" });
+      await interaction.reply({ embeds: [helpEmbed] });
       return;
     }
 
@@ -736,7 +799,7 @@ client.on("interactionCreate", async (interaction) => {
         new ButtonBuilder().setCustomId("ticket_open_bug").setLabel("Bug").setEmoji("🐞").setStyle(ButtonStyle.Danger)
       );
       await interaction.channel.send({ embeds: [panelEmbed], components: [row] });
-      await interaction.reply({ content: "Ticket panel sent.", ephemeral: true });
+      await interaction.reply({ content: "Ticket panel sent." });
       return;
     }
 
@@ -752,7 +815,7 @@ client.on("interactionCreate", async (interaction) => {
         .setTitle("FALCAO EXTERNAL • Price Table")
         .setDescription([...lines, "", `Para comprar --> ${BUY_CHANNEL_LINK}`].join("\n"));
       await interaction.channel.send({ embeds: [embed] });
-      await interaction.reply({ content: "Price table sent.", ephemeral: true });
+      await interaction.reply({ content: "Price table sent." });
       return;
     }
 
@@ -762,7 +825,7 @@ client.on("interactionCreate", async (interaction) => {
       const amount = interaction.options.getNumber("precio", true);
       pricesPayload.base[timeKey] = Number(amount.toFixed(2));
       writePrices(pricesPayload);
-      await interaction.reply({ content: `Price updated: \`${timeKey}\` -> **${pricesPayload.base[timeKey]}€**`, ephemeral: true });
+      await interaction.reply({ content: `Price updated: \`${timeKey}\` -> **${pricesPayload.base[timeKey]}€**` });
       return;
     }
 
@@ -771,7 +834,7 @@ client.on("interactionCreate", async (interaction) => {
       const durationText = interaction.options.getString("duracion", true);
       const durationMs = parseDurationToMs(durationText);
       if (!durationMs || discount <= 0 || discount >= 100) {
-        await interaction.reply({ content: "Invalid values. Example: /oferta descuento:20 duracion:7d", ephemeral: true });
+        await interaction.reply({ content: "Invalid values. Example: /oferta descuento:20 duracion:7d" });
         return;
       }
       const pricesPayload = readPrices();
@@ -786,7 +849,7 @@ client.on("interactionCreate", async (interaction) => {
         .setImage(PANEL_LOGO_URL)
         .setDescription([`💸 **Disccount:** **${pricesPayload.offer.discountPercent}%**`, `⏳ **Time left:** <t:${endUnix}:R>`, "🚀 Take advantage of it now!"].join("\n"));
       await sendLogEmbed(client, OFFER_CHANNEL_ID, embed);
-      await interaction.reply({ content: "Offer published.", ephemeral: true });
+      await interaction.reply({ content: "Offer published." });
       return;
     }
 
@@ -794,7 +857,7 @@ client.on("interactionCreate", async (interaction) => {
       const pricesPayload = readPrices();
       pricesPayload.offer = { discountPercent: 0, durationText: "", endsAt: null, expiredNotified: true };
       writePrices(pricesPayload);
-      await interaction.reply({ content: "Offer disabled.", ephemeral: true });
+      await interaction.reply({ content: "Offer disabled." });
       return;
     }
 
@@ -802,7 +865,7 @@ client.on("interactionCreate", async (interaction) => {
       const purchases = readPurchases();
       const entries = Object.entries(purchases.users || {});
       if (!entries.length) {
-        await interaction.reply({ content: "No purchases recorded yet.", ephemeral: true });
+        await interaction.reply({ content: "No purchases recorded yet." });
         return;
       }
       const page = interaction.options.getInteger("pagina") || 1;
@@ -824,13 +887,13 @@ client.on("interactionCreate", async (interaction) => {
         .setTitle("FALCAO EXTERNAL • Purchases Everyone")
         .setDescription(lines.join("\n").slice(0, 3900))
         .setFooter({ text: `Page ${safePage}/${totalPages}` });
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
     if (slashCommand === "s") {
       if (!SUGGESTION_CHANNEL_IDS.has(interaction.channelId)) {
-        await interaction.reply({ content: "This command only works in suggestion channels.", ephemeral: true });
+        await interaction.reply({ content: "This command only works in suggestion channels." });
         return;
       }
       const suggestionText = interaction.options.getString("mensaje", true);
@@ -860,7 +923,7 @@ client.on("interactionCreate", async (interaction) => {
         endsAt: endAt,
         closed: false
       });
-      await interaction.reply({ content: "Suggestion posted.", ephemeral: true });
+      await interaction.reply({ content: "Suggestion posted." });
       return;
     }
 
@@ -882,18 +945,54 @@ client.on("interactionCreate", async (interaction) => {
       };
       db.keys.push(record);
       writeDb(db);
-      await interaction.reply({ content: `Key generated: \`${record.key}\``, ephemeral: true });
+      const embed = new EmbedBuilder()
+        .setColor(BRAND_ORANGE)
+        .setTitle("FALCAO EXTERNAL • New Key")
+        .setDescription(
+          [
+            `Key: \`${record.key}\``,
+            `Status: ${record.status}`,
+            `Duration: ${record.durationDays} days`,
+            `Created: ${record.createdAt}`,
+            `Expires: ${record.expiresAt}`,
+            "HWID: -",
+            "IP: -"
+          ].join("\n")
+        )
+        .setTimestamp(new Date());
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
     if (slashCommand === "keylist") {
       const db = readDb();
       if (!db.keys.length) {
-        await interaction.reply({ content: "No keys found.", ephemeral: true });
+        await interaction.reply({ content: "No keys found." });
         return;
       }
-      const lines = db.keys.slice(0, 20).map((k) => `${statusEmoji(k.status)} \`${k.key}\` | exp: ${formatDate(k.expiresAt)}`);
-      await interaction.reply({ content: lines.join("\n"), ephemeral: true });
+      const sorted = [...db.keys].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      const blocks = sorted.slice(0, 20).map((k) => {
+        const left = daysRemaining(k.expiresAt);
+        const remainLine = left === null ? "TIME LEFT: -" : `TIME LEFT: ${left} DAY${left === 1 ? "" : "S"}`;
+        return [
+          `${statusEmoji(k.status)} **${k.key}**`,
+          `Status: ${k.status || "-"}`,
+          `Duration: ${k.durationDays ?? "-"} days`,
+          remainLine,
+          `HWID: \`${truncateCell(k.hwid || "-", 70)}\``,
+          `IP: \`${truncateCell(k.ip || "-", 45)}\``,
+          `Created: ${formatDate(k.createdAt)}`,
+          `Expires: ${formatDate(k.expiresAt)}`,
+          `First login: ${formatDate(k.firstLoginAt)}`
+        ].join("\n");
+      });
+      const embed = new EmbedBuilder()
+        .setColor(BRAND_ORANGE)
+        .setTitle("FALCAO EXTERNAL • Keylist")
+        .setDescription(`Showing 1-${Math.min(20, sorted.length)} of ${sorted.length} keys\n\n${blocks.join("\n------------------------------\n").slice(0, 3600)}`)
+        .setFooter({ text: `Total: ${sorted.length} keys` })
+        .setTimestamp(new Date());
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
@@ -901,7 +1000,27 @@ client.on("interactionCreate", async (interaction) => {
       const db = readDb();
       const key = interaction.options.getString("key", true);
       const found = getKeyRecord(db, key);
-      await interaction.reply({ content: found ? `Key: \`${found.key}\`\nStatus: ${found.status}\nHWID: ${found.hwid || "-"}\nIP: ${found.ip || "-"}` : "Key not found.", ephemeral: true });
+      if (!found) {
+        await interaction.reply({ content: "Key not found." });
+        return;
+      }
+      const embed = new EmbedBuilder()
+        .setColor(BRAND_ORANGE)
+        .setTitle("FALCAO EXTERNAL • Key Check")
+        .setDescription(
+          [
+            `Key: \`${found.key}\``,
+            `Status: ${found.status}`,
+            `Duration: ${found.durationDays ?? "-"} days`,
+            `Created: ${found.createdAt || "-"}`,
+            `Expires: ${found.expiresAt || "-"}`,
+            `HWID: ${found.hwid || "-"}`,
+            `IP: ${found.ip || "-"}`,
+            `First login: ${found.firstLoginAt || "-"}`
+          ].join("\n")
+        )
+        .setTimestamp(new Date());
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
@@ -911,7 +1030,7 @@ client.on("interactionCreate", async (interaction) => {
       const before = db.keys.length;
       db.keys = db.keys.filter((k) => k.key !== key);
       writeDb(db);
-      await interaction.reply({ content: db.keys.length === before ? "Key not found." : `Deleted key: \`${key}\``, ephemeral: true });
+      await interaction.reply({ content: db.keys.length === before ? "Key not found." : `Deleted key: \`${key}\`` });
       return;
     }
 
@@ -920,14 +1039,14 @@ client.on("interactionCreate", async (interaction) => {
       const key = interaction.options.getString("key", true);
       const found = getKeyRecord(db, key);
       if (!found) {
-        await interaction.reply({ content: "Key not found.", ephemeral: true });
+        await interaction.reply({ content: "Key not found." });
         return;
       }
       found.hwid = null;
       found.ip = null;
       found.firstLoginAt = null;
       writeDb(db);
-      await interaction.reply({ content: `HWID/IP reset for \`${key}\`.`, ephemeral: true });
+      await interaction.reply({ content: `HWID/IP reset for \`${key}\`.` });
       return;
     }
     return;
@@ -1006,8 +1125,9 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   if (interaction.customId.startsWith("ticket_lang_")) {
+    await interaction.deferReply({ ephemeral: true });
     if (isOnCooldown(interaction.user.id, "ticket_lang")) {
-      await interaction.reply({ content: "Please wait a second before trying again.", ephemeral: true });
+      await interaction.editReply({ content: "Please wait a second before trying again." });
       return;
     }
     const langMatch = /^ticket_lang_(en|es)_(ticket_open_[a-z]+)$/.exec(interaction.customId);
@@ -1016,13 +1136,13 @@ client.on("interactionCreate", async (interaction) => {
     const ticketCustomId = langMatch[2];
     const typeData = TICKET_TYPES[ticketCustomId];
     if (!typeData) {
-      await interaction.reply({ content: "Invalid ticket type.", ephemeral: true });
+      await interaction.editReply({ content: "Invalid ticket type." });
       return;
     }
 
     const guild = interaction.guild;
     if (!guild) {
-      await interaction.reply({ content: "This button only works inside a server.", ephemeral: true });
+      await interaction.editReply({ content: "This button only works inside a server." });
       return;
     }
 
@@ -1034,7 +1154,7 @@ client.on("interactionCreate", async (interaction) => {
         ch.permissionOverwrites.cache.has(interaction.user.id)
     );
     if (existing) {
-      await interaction.reply({ content: `You already have an open ticket: <#${existing.id}>`, ephemeral: true });
+      await interaction.editReply({ content: `You already have an open ticket: <#${existing.id}>` });
       return;
     }
 
@@ -1110,7 +1230,7 @@ client.on("interactionCreate", async (interaction) => {
       await ticketChannel.send({ embeds: [buyEmbed], components: [row1, row2] });
     }
 
-    await interaction.reply({ content: `Ticket created: <#${ticketChannel.id}>`, ephemeral: true });
+    await interaction.editReply({ content: `Ticket created: <#${ticketChannel.id}>` });
     await logGeneral(client, "Ticket opened", [
       { name: "Usuario", value: `${interaction.user.tag} (${interaction.user.id})`, inline: false },
       { name: "Tipo", value: typeData.label, inline: true },
@@ -1333,5 +1453,21 @@ client.on("interactionCreate", async (interaction) => {
 
     buySelections.delete(interaction.channel.id);
     await interaction.channel.delete("Ticket closed by button action.");
+  }
+  } catch (error) {
+    await logError("interactionCreate", error, {
+      customId: interaction?.isButton?.() ? interaction.customId : "-",
+      command: interaction?.isChatInputCommand?.() ? interaction.commandName : "-",
+      userId: interaction?.user?.id || "-"
+    });
+    try {
+      if (interaction.isRepliable()) {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.followUp({ content: "An error occurred while processing this action.", ephemeral: true });
+        } else {
+          await interaction.reply({ content: "An error occurred while processing this action.", ephemeral: true });
+        }
+      }
+    } catch (_) {}
   }
 });
