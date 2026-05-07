@@ -2,7 +2,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const PREFIX = process.env.PREFIX || "!";
@@ -94,19 +94,29 @@ function validateAndBindKey(db, key, hwid, ip) {
   return { ok: true, message: "Key valida para este HWID/IP.", key: found };
 }
 
-function renderKeyTable(rows) {
-  const header = ["KEY", "STATUS", "DAYS", "HWID", "IP"];
-  const data = rows.map((k) => [
-    k.key,
-    k.status,
-    String(k.durationDays),
-    k.hwid || "-",
-    k.ip || "-"
-  ]);
-  const widths = header.map((h, i) => Math.max(h.length, ...data.map((r) => r[i].length)));
-  const line = (arr) => arr.map((v, i) => v.padEnd(widths[i], " ")).join(" | ");
-  const sep = widths.map((w) => "-".repeat(w)).join("-|-");
-  return [line(header), sep, ...data.map(line)].join("\n");
+function truncateCell(value, maxLength = 32) {
+  const text = String(value ?? "-");
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toISOString().slice(0, 16).replace("T", " ");
+}
+
+function statusEmoji(status) {
+  switch ((status || "").toLowerCase()) {
+    case "active":
+      return "🟢";
+    case "expired":
+      return "🔴";
+    case "paused":
+      return "🟡";
+    default:
+      return "⚪";
+  }
 }
 
 const app = express();
@@ -329,13 +339,34 @@ client.on("messageCreate", async (message) => {
       await message.reply("No hay keys guardadas.");
       return;
     }
-    const pageSize = 15;
+    const pageSize = 8;
     for (let start = 0; start < db.keys.length; start += pageSize) {
       const chunk = db.keys.slice(start, start + pageSize);
-      const table = renderKeyTable(chunk);
-      await message.reply(
-        `\`\`\`txt\nKEYLIST ${start + 1}-${start + chunk.length} de ${db.keys.length}\n${table}\n\`\`\``
-      );
+      const embed = new EmbedBuilder()
+        .setColor(0xff8a33)
+        .setTitle("Falcão External • Keylist")
+        .setDescription(`Mostrando **${start + 1}-${start + chunk.length}** de **${db.keys.length}** keys`)
+        .setFooter({
+          text: `Página ${Math.floor(start / pageSize) + 1}/${Math.ceil(db.keys.length / pageSize)}`
+        })
+        .setTimestamp(new Date());
+
+      for (const k of chunk) {
+        const title = `${statusEmoji(k.status)} ${truncateCell(k.key, 45)}`;
+        const value = [
+          `**Estado:** ${k.status || "-"}`,
+          `**Duración:** ${k.durationDays ?? "-"} días`,
+          `**HWID:** \`${truncateCell(k.hwid || "-", 50)}\``,
+          `**IP:** \`${truncateCell(k.ip || "-", 30)}\``,
+          `**Creada:** ${formatDate(k.createdAt)}`,
+          `**Expira:** ${formatDate(k.expiresAt)}`,
+          `**First login:** ${formatDate(k.firstLoginAt)}`
+        ].join("\n");
+
+        embed.addFields({ name: title, value, inline: true });
+      }
+
+      await message.reply({ embeds: [embed] });
     }
     return;
   }
