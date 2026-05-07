@@ -362,8 +362,13 @@ function randomAlphaNum(length) {
   return out;
 }
 
+function normalizeKey(raw) {
+  return String(raw || "").trim().toUpperCase();
+}
+
 function generateKey() {
-  return `FALCAO-EXTERNAL-${randomAlphaNum(5)}-${randomAlphaNum(5)}`;
+  // Match the menu's displayed fixed format: Falcao-External-XXXXXX-XXXXXXX
+  return `FALCAO-EXTERNAL-${randomAlphaNum(6)}-${randomAlphaNum(7)}`;
 }
 
 function calcExpiresAt(days) {
@@ -372,7 +377,8 @@ function calcExpiresAt(days) {
 }
 
 function getKeyRecord(db, key) {
-  return db.keys.find((k) => k.key === key);
+  const normalized = normalizeKey(key);
+  return db.keys.find((k) => normalizeKey(k.key) === normalized);
 }
 
 function validateAndBindKey(db, key, hwid, ip) {
@@ -394,6 +400,8 @@ function validateAndBindKey(db, key, hwid, ip) {
     found.firstLoginAt = new Date().toISOString();
     found.hwid = hwid;
     found.ip = ip;
+    // Normalize stored key for consistent future comparisons.
+    found.key = normalizeKey(found.key);
     writeDb(db);
     return { ok: true, message: "Primer login registrado. Key vinculada a HWID/IP.", key: found };
   }
