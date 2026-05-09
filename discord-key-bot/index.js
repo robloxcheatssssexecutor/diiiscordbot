@@ -35,10 +35,77 @@ if (!TOKEN) {
   throw new Error("Missing DISCORD_TOKEN in .env");
 }
 
-const dataDir = path.join(__dirname, "data");
+function resolveDataDir() {
+  const fromEnv = process.env.PERSISTENT_DATA_DIR || process.env.DATA_DIR;
+  if (fromEnv && String(fromEnv).trim()) {
+    return path.resolve(String(fromEnv).trim());
+  }
+  return path.join(__dirname, "data");
+}
+
+const dataDir = resolveDataDir();
 const dbPath = path.join(dataDir, "keys.json");
 const pricesPath = path.join(dataDir, "prices.json");
 const purchasesPath = path.join(dataDir, "purchases.json");
+
+function atomicWriteJsonFile(filePath, obj) {
+  const json = JSON.stringify(obj, null, 2);
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  if (fs.existsSync(filePath)) {
+    try {
+      fs.copyFileSync(filePath, `${filePath}.bak`);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmpPath, json, "utf8");
+  try {
+    fs.renameSync(tmpPath, filePath);
+  } catch (_) {
+    fs.copyFileSync(tmpPath, filePath);
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch (__) {
+      /* ignore */
+    }
+  }
+}
+
+function restoreKeysFromLatestBackup() {
+  const backupDir = path.join(dataDir, "backups");
+  if (!fs.existsSync(backupDir)) {
+    return null;
+  }
+  let files;
+  try {
+    files = fs.readdirSync(backupDir);
+  } catch (_) {
+    return null;
+  }
+  const candidates = files.filter((f) => f.startsWith("keys-") && f.endsWith(".json"));
+  if (!candidates.length) {
+    return null;
+  }
+  const sorted = candidates
+    .map((f) => ({ f, t: fs.statSync(path.join(backupDir, f)).mtimeMs }))
+    .sort((a, b) => b.t - a.t);
+  for (const { f } of sorted) {
+    try {
+      const p = path.join(backupDir, f);
+      const parsed = JSON.parse(fs.readFileSync(p, "utf8"));
+      if (parsed && Array.isArray(parsed.keys)) {
+        return parsed;
+      }
+    } catch (_) {
+      /* try next */
+    }
+  }
+  return null;
+}
 const BRAND_ORANGE = 0xff8a33;
 const BUTTON_COOLDOWN_MS = 2500;
 const BACKUP_INTERVAL_HOURS = Number(process.env.BACKUP_INTERVAL_HOURS || 6);
@@ -164,7 +231,7 @@ function readPrices() {
 
 function writePrices(prices) {
   ensurePrices();
-  fs.writeFileSync(pricesPath, JSON.stringify(prices, null, 2), "utf8");
+  atomicWriteJsonFile(pricesPath, prices);
 }
 
 function readPurchases() {
@@ -174,7 +241,7 @@ function readPurchases() {
 
 function writePurchases(payload) {
   ensurePurchases();
-  fs.writeFileSync(purchasesPath, JSON.stringify(payload, null, 2), "utf8");
+  atomicWriteJsonFile(purchasesPath, payload);
 }
 
 function getActiveDiscount(pricesPayload) {
@@ -216,11 +283,44 @@ function parseDurationToMs(rawDuration) {
 
 function readDb() {
   ensureDb();
-  return JSON.parse(fs.readFileSync(dbPath, "utf8"));
+  const parseKeysFile = (p) => {
+    const raw = fs.readFileSync(p, "utf8");
+    const data = JSON.parse(raw);
+    if (!data || !Array.isArray(data.keys)) {
+      throw new Error("Invalid keys database shape");
+    }
+    return data;
+  };
+  try {
+    return parseKeysFile(dbPath);
+  } catch (e) {
+    console.error(`[data] Cannot read ${dbPath}:`, e.message);
+    try {
+      const bak = `${dbPath}.bak`;
+      if (fs.existsSync(bak)) {
+        const restored = parseKeysFile(bak);
+        console.warn("[data] Restored keys from keys.json.bak");
+        atomicWriteJsonFile(dbPath, restored);
+        return restored;
+      }
+    } catch (e2) {
+      console.error("[data] keys.json.bak unusable:", e2.message);
+    }
+    const fromScheduledBackup = restoreKeysFromLatestBackup();
+    if (fromScheduledBackup) {
+      console.warn("[data] Restored keys from data/backups snapshot");
+      atomicWriteJsonFile(dbPath, fromScheduledBackup);
+      return fromScheduledBackup;
+    }
+    console.error("[data] No backup found; initializing empty keys database");
+    const empty = { keys: [] };
+    atomicWriteJsonFile(dbPath, empty);
+    return empty;
+  }
 }
 
 function writeDb(db) {
-  fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), "utf8");
+  atomicWriteJsonFile(dbPath, db);
 }
 
 function hasRequiredRole(member) {
@@ -600,6 +700,11 @@ const client = new Client({
 
 client.once("ready", () => {
   console.log(`Bot online: ${client.user.tag}`);
+  console.log(`[data] Persistent directory: ${dataDir}`);
+  console.log(`[data] Keys file: ${dbPath}`);
+  if (!process.env.PERSISTENT_DATA_DIR && !process.env.DATA_DIR) {
+    console.log("[data] Tip: set PERSISTENT_DATA_DIR to a mounted volume path on your host so keys survive redeploys.");
+  }
   const slashCommands = [
     new SlashCommandBuilder().setName("falcaohelp").setDescription("Show bot commands."),
     new SlashCommandBuilder().setName("ticketpanel").setDescription("Send ticket panel."),
