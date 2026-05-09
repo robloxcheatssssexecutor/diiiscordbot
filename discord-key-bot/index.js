@@ -1175,8 +1175,8 @@ client.on("interactionCreate", async (interaction) => {
         .setTimestamp(new Date());
       const rowsWithCopyButtons = sorted.slice(0, 5).map((k, idx) =>
         new ActionRowBuilder().addComponents(
-          createCopyButton(`#${idx + 1} K`, k.key || "-"),
-          createCopyButton(`#${idx + 1} H`, k.hwid || "-"),
+          createCopyButton(`#${idx + 1} KEY`, k.key || "-"),
+          createCopyButton(`#${idx + 1} HWID`, k.hwid || "-"),
           createCopyButton(`#${idx + 1} IP`, k.ip || "-")
         )
       );
@@ -1337,7 +1337,7 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     await interaction.reply({
-      content: `\`${payload.value}\``,
+      content: `Press the copy icon in this block:\n\`\`\`\n${payload.value}\n\`\`\``,
       ephemeral: true
     });
     return;
