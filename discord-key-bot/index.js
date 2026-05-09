@@ -9,7 +9,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  SlashCommandBuilder
+  SlashCommandBuilder,
+  AttachmentBuilder
 } = require("discord.js");
 
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -39,6 +40,25 @@ function resolveDataDir() {
   const fromEnv = process.env.PERSISTENT_DATA_DIR || process.env.DATA_DIR;
   if (fromEnv && String(fromEnv).trim()) {
     return path.resolve(String(fromEnv).trim());
+  }
+  // Auto-detect common mounted persistent disk locations on hosts like Render.
+  // Prefer a dedicated subfolder to avoid collisions.
+  const candidates = [
+    "/var/data/falcao-external",
+    "/data/falcao-external",
+    "/mnt/data/falcao-external"
+  ];
+  for (const p of candidates) {
+    try {
+      if (!fs.existsSync(p)) continue;
+      fs.mkdirSync(p, { recursive: true });
+      const probe = path.join(p, ".write-test");
+      fs.writeFileSync(probe, "ok", "utf8");
+      fs.unlinkSync(probe);
+      return p;
+    } catch (_) {
+      // try next
+    }
   }
   return path.join(__dirname, "data");
 }
@@ -786,6 +806,17 @@ client.once("ready", () => {
     new SlashCommandBuilder()
       .setName("datadir")
       .setDescription("Show the current persistent data directory.")
+    ,
+    new SlashCommandBuilder()
+      .setName("keybackups")
+      .setDescription("Export all keys as a JSON file (downloadable).")
+    ,
+    new SlashCommandBuilder()
+      .setName("keyimports")
+      .setDescription("Import keys from a JSON backup file.")
+      .addAttachmentOption((o) =>
+        o.setName("archivo").setDescription("JSON file from /keybackups").setRequired(true)
+      )
   ].map((cmd) => cmd.toJSON());
 
   client.application.commands.set(slashCommands).catch((error) => {
@@ -1142,7 +1173,14 @@ client.on("interactionCreate", async (interaction) => {
         .setDescription(`Showing 1-${Math.min(20, sorted.length)} of ${sorted.length} keys\n\n${blocks.join("\n------------------------------\n").slice(0, 3600)}`)
         .setFooter({ text: `Total: ${sorted.length} keys` })
         .setTimestamp(new Date());
-      await safeReply(interaction, { embeds: [embed] });
+      const rowsWithCopyButtons = sorted.slice(0, 5).map((k, idx) =>
+        new ActionRowBuilder().addComponents(
+          createCopyButton(`#${idx + 1} K`, k.key || "-"),
+          createCopyButton(`#${idx + 1} H`, k.hwid || "-"),
+          createCopyButton(`#${idx + 1} IP`, k.ip || "-")
+        )
+      );
+      await safeReply(interaction, { embeds: [embed], components: rowsWithCopyButtons });
       return;
     }
 
@@ -1186,6 +1224,79 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
+    if (slashCommand === "keybackups") {
+      await safeDefer(interaction, true);
+      const db = readDb();
+      const payload = {
+        schema: "falcao-external-keys-backup-v1",
+        exportedAt: new Date().toISOString(),
+        keys: Array.isArray(db.keys) ? db.keys : []
+      };
+      const jsonText = JSON.stringify(payload, null, 2);
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `keys-backup-${stamp}.json`;
+      const attachment = new AttachmentBuilder(Buffer.from(jsonText, "utf8"), { name: fileName });
+      await safeReply(interaction, {
+        content: `Backup generated. Keys: **${payload.keys.length}**`,
+        files: [attachment]
+      });
+      return;
+    }
+
+    if (slashCommand === "keyimports") {
+      await safeDefer(interaction, true);
+      const file = interaction.options.getAttachment("archivo", true);
+      if (!file?.url) {
+        await safeReply(interaction, { content: "Missing file URL." });
+        return;
+      }
+
+      const res = await fetch(file.url);
+      if (!res.ok) {
+        await safeReply(interaction, { content: `Could not download file (HTTP ${res.status}).` });
+        return;
+      }
+      const text = await res.text();
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (_) {
+        await safeReply(interaction, { content: "Invalid JSON file." });
+        return;
+      }
+
+      const incomingKeys = Array.isArray(parsed?.keys) ? parsed.keys : Array.isArray(parsed?.data?.keys) ? parsed.data.keys : null;
+      if (!incomingKeys) {
+        await safeReply(interaction, { content: "Backup file shape not recognized (expected { keys: [...] })." });
+        return;
+      }
+
+      const db = readDb();
+      const existing = new Map((db.keys || []).map((k) => [normalizeKey(k.key), k]));
+      let imported = 0;
+      let skipped = 0;
+
+      for (const rec of incomingKeys) {
+        const k = normalizeKey(rec?.key);
+        if (!k) {
+          skipped += 1;
+          continue;
+        }
+        if (existing.has(k)) {
+          skipped += 1;
+          continue;
+        }
+        // Preserve exact fields from backup without altering timestamps.
+        db.keys.push({ ...rec, key: k });
+        existing.set(k, rec);
+        imported += 1;
+      }
+
+      writeDb(db);
+      await safeReply(interaction, { content: `Import done. Imported: **${imported}** | Skipped: **${skipped}** | Total now: **${db.keys.length}**` });
+      return;
+    }
+
     if (slashCommand === "keydel") {
       const db = readDb();
       const key = interaction.options.getString("key", true);
@@ -1221,7 +1332,7 @@ client.on("interactionCreate", async (interaction) => {
     const payload = copyPayloads.get(token);
     if (!payload || payload.expiresAt < Date.now()) {
       copyPayloads.delete(token);
-      await interaction.reply({ content: "Este botón expiró. Usa `!keylist` otra vez.", ephemeral: true });
+      await interaction.reply({ content: "This button expired. Run `/keylist` again.", ephemeral: true });
       return;
     }
 
