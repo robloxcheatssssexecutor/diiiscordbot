@@ -130,6 +130,33 @@ const LICENSE_TIMES = [
   { id: "custom", label: "Custom Time" }
 ];
 
+async function safeReply(interaction, payload) {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      return await interaction.editReply(payload);
+    }
+    return await interaction.reply(payload);
+  } catch (error) {
+    // DiscordAPIError[10062]: Unknown interaction (expired token / too slow)
+    // DiscordAPIError[40060]: Interaction has already been acknowledged
+    const code = Number(error?.code || 0);
+    if (code === 10062 || code === 40060) return null;
+    throw error;
+  }
+}
+
+async function safeDefer(interaction, ephemeral = false) {
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ ephemeral });
+    }
+  } catch (error) {
+    const code = Number(error?.code || 0);
+    if (code === 10062 || code === 40060) return;
+    throw error;
+  }
+}
+
 function ensureDb() {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
@@ -755,6 +782,10 @@ client.once("ready", () => {
       .setName("resethwid")
       .setDescription("Reset HWID/IP for a key.")
       .addStringOption((o) => o.setName("key").setDescription("License key").setRequired(true))
+    ,
+    new SlashCommandBuilder()
+      .setName("datadir")
+      .setDescription("Show the current persistent data directory.")
   ].map((cmd) => cmd.toJSON());
 
   client.application.commands.set(slashCommands).catch((error) => {
@@ -856,8 +887,13 @@ client.on("interactionCreate", async (interaction) => {
     const publicSlashCommands = new Set(["falcaohelp", "s"]);
     const requiresRole = !publicSlashCommands.has(slashCommand);
     if (requiresRole && !hasRequiredRole(interaction.member)) {
-      await interaction.reply({ content: `Not authorized. You need role <@&${REQUIRED_ROLE_ID}>.` });
+      await safeReply(interaction, { content: `Not authorized. You need role <@&${REQUIRED_ROLE_ID}>.` });
       return;
+    }
+
+    const slowCommands = new Set(["keylist", "compraseveryone"]);
+    if (slowCommands.has(slashCommand)) {
+      await safeDefer(interaction, false);
     }
 
     if (slashCommand === "falcaohelp") {
@@ -890,7 +926,7 @@ client.on("interactionCreate", async (interaction) => {
           }
         )
         .setFooter({ text: "Slash commands only" });
-      await interaction.reply({ embeds: [helpEmbed] });
+      await safeReply(interaction, { embeds: [helpEmbed] });
       return;
     }
 
@@ -979,7 +1015,7 @@ client.on("interactionCreate", async (interaction) => {
       const purchases = readPurchases();
       const entries = Object.entries(purchases.users || {});
       if (!entries.length) {
-        await interaction.reply({ content: "No purchases recorded yet." });
+        await safeReply(interaction, { content: "No purchases recorded yet." });
         return;
       }
       const page = interaction.options.getInteger("pagina") || 1;
@@ -1001,7 +1037,7 @@ client.on("interactionCreate", async (interaction) => {
         .setTitle("FALCAO EXTERNAL • Purchases Everyone")
         .setDescription(lines.join("\n").slice(0, 3900))
         .setFooter({ text: `Page ${safePage}/${totalPages}` });
-      await interaction.reply({ embeds: [embed] });
+      await safeReply(interaction, { embeds: [embed] });
       return;
     }
 
@@ -1074,14 +1110,14 @@ client.on("interactionCreate", async (interaction) => {
           ].join("\n")
         )
         .setTimestamp(new Date());
-      await interaction.reply({ embeds: [embed] });
+      await safeReply(interaction, { embeds: [embed] });
       return;
     }
 
     if (slashCommand === "keylist") {
       const db = readDb();
       if (!db.keys.length) {
-        await interaction.reply({ content: "No keys found." });
+        await safeReply(interaction, { content: "No keys found." });
         return;
       }
       const sorted = [...db.keys].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
@@ -1106,7 +1142,7 @@ client.on("interactionCreate", async (interaction) => {
         .setDescription(`Showing 1-${Math.min(20, sorted.length)} of ${sorted.length} keys\n\n${blocks.join("\n------------------------------\n").slice(0, 3600)}`)
         .setFooter({ text: `Total: ${sorted.length} keys` })
         .setTimestamp(new Date());
-      await interaction.reply({ embeds: [embed] });
+      await safeReply(interaction, { embeds: [embed] });
       return;
     }
 
@@ -1115,7 +1151,7 @@ client.on("interactionCreate", async (interaction) => {
       const key = interaction.options.getString("key", true);
       const found = getKeyRecord(db, key);
       if (!found) {
-        await interaction.reply({ content: "Key not found." });
+        await safeReply(interaction, { content: "Key not found." });
         return;
       }
       const embed = new EmbedBuilder()
@@ -1134,7 +1170,19 @@ client.on("interactionCreate", async (interaction) => {
           ].join("\n")
         )
         .setTimestamp(new Date());
-      await interaction.reply({ embeds: [embed] });
+      await safeReply(interaction, { embeds: [embed] });
+      return;
+    }
+
+    if (slashCommand === "datadir") {
+      const usingEnv = !!(process.env.PERSISTENT_DATA_DIR || process.env.DATA_DIR);
+      await safeReply(interaction, {
+        content: [
+          `Persistent data dir: \`${dataDir}\``,
+          `Keys DB: \`${dbPath}\``,
+          `Using env override: **${usingEnv ? "YES" : "NO"}**`
+        ].join("\n")
+      });
       return;
     }
 
