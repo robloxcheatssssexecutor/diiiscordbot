@@ -519,6 +519,21 @@ function generateKey() {
   return `FALCAO-EXTERNAL-${randomAlphaNum(6)}-${randomAlphaNum(7)}`;
 }
 
+function normalizePlan(rawPlan) {
+  const plan = String(rawPlan || "falcao").trim().toLowerCase();
+  if (plan === "falcao" || plan === "temp" || plan === "both") return plan;
+  return null;
+}
+
+function canUsePlanForProduct(plan, product) {
+  const normalizedPlan = normalizePlan(plan);
+  const normalizedProduct = normalizePlan(product);
+  if (!normalizedProduct) return true;
+  if (!normalizedPlan) return false;
+  if (normalizedPlan === "both") return true;
+  return normalizedPlan === normalizedProduct;
+}
+
 function calcExpiresAt(days) {
   const now = Date.now();
   return new Date(now + days * 24 * 60 * 60 * 1000).toISOString();
@@ -529,10 +544,15 @@ function getKeyRecord(db, key) {
   return db.keys.find((k) => normalizeKey(k.key) === normalized);
 }
 
-function validateAndBindKey(db, key, hwid, ip) {
+function validateAndBindKey(db, key, hwid, ip, product) {
   const found = getKeyRecord(db, key);
   if (!found) {
     return { ok: false, message: "Key no existe." };
+  }
+  const keyPlan = normalizePlan(found.plan) || "falcao";
+  if (!canUsePlanForProduct(keyPlan, product)) {
+    const productName = normalizePlan(product) || "unknown";
+    return { ok: false, message: `Acceso denegado: esta key es del plan ${keyPlan} y no sirve para ${productName}.` };
   }
   if (found.status !== "active") {
     return { ok: false, message: `Key no valida. Estado: ${found.status}` };
@@ -633,6 +653,7 @@ function getClientIp(req) {
 app.post("/api/v1/licenses/activate", (req, res) => {
   const { license_key: licenseKey, hwid } = req.body || {};
   const ipHint = (req.body && req.body.ip_hint) || "";
+  const product = (req.body && (req.body.product || req.body.plan)) || "";
   const ip = ipHint || getClientIp(req);
   if (!licenseKey || !hwid) {
     res.status(400).json({ success: false, message: "Missing fields: license_key, hwid." });
@@ -640,7 +661,7 @@ app.post("/api/v1/licenses/activate", (req, res) => {
   }
 
   const db = readDb();
-  const result = validateAndBindKey(db, licenseKey, hwid, ip);
+  const result = validateAndBindKey(db, licenseKey, hwid, ip, product);
   if (!result.ok) {
     res.status(403).json({ success: false, message: result.message });
     return;
@@ -657,6 +678,7 @@ app.post("/api/v1/licenses/activate", (req, res) => {
 // Compatibility endpoint for old menu clients.
 app.post("/api/v1/licenses/validate", (req, res) => {
   const { license_key: licenseKey, hwid } = req.body || {};
+  const product = (req.body && (req.body.product || req.body.plan)) || "";
   if (!licenseKey || !hwid) {
     res.status(400).json({ success: false, valid: false, message: "Missing fields: license_key, hwid." });
     return;
@@ -684,6 +706,27 @@ app.post("/api/v1/licenses/validate", (req, res) => {
     return;
   }
 
+  const keyPlan = normalizePlan(found.plan) || "falcao";
+  if (!canUsePlanForProduct(keyPlan, product)) {
+    res.status(403).json({
+      success: false,
+      valid: false,
+      activated: !!found.firstLoginAt,
+      paused: false,
+      banned: false,
+      expired: found.status === "expired",
+      is_admin: false,
+      license_id: found.key,
+      license_key_masked: maskLicenseKey(found.key),
+      plan: keyPlan,
+      expires_at: found.expiresAt || "",
+      max_devices: 1,
+      active_devices: found.firstLoginAt ? 1 : 0,
+      message: `License plan ${keyPlan} is not valid for ${normalizePlan(product) || "this product"}.`
+    });
+    return;
+  }
+
   if (found.expiresAt && new Date(found.expiresAt).getTime() < Date.now()) {
     found.status = "expired";
     writeDb(db);
@@ -704,7 +747,7 @@ app.post("/api/v1/licenses/validate", (req, res) => {
     is_admin: false,
     license_id: found.key,
     license_key_masked: maskLicenseKey(found.key),
-    plan: "discord-bot",
+    plan: keyPlan,
     expires_at: found.expiresAt || "",
     max_devices: 1,
     active_devices: found.firstLoginAt ? 1 : 0,
@@ -719,14 +762,15 @@ app.post("/api/license/validate", (req, res) => {
     return;
   }
 
-  const { key, hwid, ip } = req.body || {};
+  const { key, hwid, ip, product, plan } = req.body || {};
   if (!key || !hwid || !ip) {
     res.status(400).json({ ok: false, message: "Faltan campos: key, hwid, ip." });
     return;
   }
 
   const db = readDb();
-  const result = validateAndBindKey(db, key, hwid, ip);
+  const selectedProduct = product || plan || "";
+  const result = validateAndBindKey(db, key, hwid, ip, selectedProduct);
   if (!result.ok) {
     res.status(403).json(result);
     return;
@@ -736,6 +780,7 @@ app.post("/api/license/validate", (req, res) => {
     ok: true,
     message: result.message,
     key: result.key.key,
+    plan: normalizePlan(result.key.plan) || "falcao",
     expiresAt: result.key.expiresAt,
     firstLoginAt: result.key.firstLoginAt
   });
@@ -788,7 +833,18 @@ client.once("ready", () => {
     new SlashCommandBuilder()
       .setName("keygen")
       .setDescription("Generate one key.")
-      .addIntegerOption((o) => o.setName("dias").setDescription("Duration in days").setRequired(true).setMinValue(1)),
+      .addIntegerOption((o) => o.setName("dias").setDescription("Duration in days").setRequired(true).setMinValue(1))
+      .addStringOption((o) =>
+        o
+          .setName("plan")
+          .setDescription("License plan: falcao, temp, both")
+          .setRequired(true)
+          .addChoices(
+            { name: "Falcao", value: "falcao" },
+            { name: "Temp", value: "temp" },
+            { name: "Both", value: "both" }
+          )
+      ),
     new SlashCommandBuilder().setName("keylist").setDescription("List all keys."),
     new SlashCommandBuilder()
       .setName("keycheck")
@@ -1111,10 +1167,16 @@ client.on("interactionCreate", async (interaction) => {
     if (slashCommand === "keygen") {
       const db = readDb();
       const days = interaction.options.getInteger("dias", true);
+      const plan = normalizePlan(interaction.options.getString("plan", true));
+      if (!plan) {
+        await safeReply(interaction, { content: "Plan invalido. Usa: falcao, temp o both." });
+        return;
+      }
       let key = generateKey();
       while (getKeyRecord(db, key)) key = generateKey();
       const record = {
         key,
+        plan,
         status: "active",
         createdAt: new Date().toISOString(),
         durationDays: days,
@@ -1132,6 +1194,7 @@ client.on("interactionCreate", async (interaction) => {
         .setDescription(
           [
             `Key: \`${record.key}\``,
+            `Plan: ${record.plan}`,
             `Status: ${record.status}`,
             `Duration: ${record.durationDays} days`,
             `Created: ${record.createdAt}`,
@@ -1155,8 +1218,10 @@ client.on("interactionCreate", async (interaction) => {
       const blocks = sorted.slice(0, 20).map((k) => {
         const left = daysRemaining(k.expiresAt);
         const remainLine = left === null ? "TIME LEFT: -" : `TIME LEFT: ${left} DAY${left === 1 ? "" : "S"}`;
+        const keyPlan = normalizePlan(k.plan) || "falcao";
         return [
           `${statusEmoji(k.status)} **${k.key}**`,
+          `Plan: ${keyPlan}`,
           `Status: ${k.status || "-"}`,
           `Duration: ${k.durationDays ?? "-"} days`,
           remainLine,
@@ -1198,6 +1263,7 @@ client.on("interactionCreate", async (interaction) => {
         .setDescription(
           [
             `Key: \`${found.key}\``,
+            `Plan: ${normalizePlan(found.plan) || "falcao"}`,
             `Status: ${found.status}`,
             `Duration: ${found.durationDays ?? "-"} days`,
             `Created: ${found.createdAt || "-"}`,
