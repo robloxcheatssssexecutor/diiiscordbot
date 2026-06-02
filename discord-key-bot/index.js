@@ -615,6 +615,7 @@ function daysRemaining(expiresAt) {
 }
 
 const copyPayloads = new Map();
+const { mountUserRoutes } = require("./users_api");
 
 function createCopyButton(label, value) {
   const token = randomAlphaNum(8);
@@ -628,6 +629,21 @@ function createCopyButton(label, value) {
 
 const app = express();
 app.use(express.json());
+
+mountUserRoutes(app, {
+  dataDir,
+  atomicWriteJsonFile,
+  readDb,
+  writeDb,
+  getKeyRecord,
+  validateAndBindKey,
+  maskLicenseKey: (key) => {
+    if (!key || key.length < 8) return key || "";
+    return `${key.slice(0, 8)}****${key.slice(-4)}`;
+  },
+  getClientIp,
+  normalizePlan
+});
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "discord-key-bot-api" });
