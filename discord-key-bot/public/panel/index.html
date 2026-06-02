@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#111318" />
+  <title>Falcao Remote Panel</title>
+  <style>
+    :root {
+      --bg: #0f1116;
+      --card: #171a22;
+      --stroke: #2a3040;
+      --text: #eef1f7;
+      --muted: #9aa3b5;
+      --accent: #ff8a33;
+      --accent-dim: rgba(255, 138, 51, 0.15);
+      --ok: #3ecf6a;
+      --err: #ff5d5d;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, system-ui, sans-serif;
+      background: radial-gradient(circle at top, #1a2030 0%, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100dvh;
+    }
+    .app { max-width: 720px; margin: 0 auto; padding: 16px 14px 96px; }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .brand img { width: 42px; height: 42px; border-radius: 10px; }
+    .brand h1 { font-size: 1.15rem; margin: 0; }
+    .brand p { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .status {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      font-size: 0.9rem;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--err); box-shadow: 0 0 10px rgba(255,93,93,.45); }
+    .dot.online { background: var(--ok); box-shadow: 0 0 10px rgba(62,207,106,.45); }
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"], input[type="number"], input[type="password"], select {
+      width: 100%; padding: 12px 14px; border-radius: 12px;
+      border: 1px solid var(--stroke); background: #0d1017; color: var(--text);
+      font-size: 1rem;
+    }
+    button {
+      border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 600;
+      background: var(--accent); color: #111; cursor: pointer;
+    }
+    button.secondary { background: #252b39; color: var(--text); }
+    button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--stroke); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 120px; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 12px; position: sticky; top: 0; z-index: 5; background: rgba(15,17,22,.92); backdrop-filter: blur(8px); padding: 8px 0; }
+    .toolbar input { flex: 1; }
+    .tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
+    .tab {
+      white-space: nowrap; padding: 8px 12px; border-radius: 999px;
+      border: 1px solid var(--stroke); color: var(--muted); background: transparent; font-size: .85rem;
+    }
+    .tab.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(255,138,51,.35); }
+    .section-title { font-size: .95rem; margin: 0 0 10px; color: var(--accent); }
+    .option {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .option:last-child { border-bottom: 0; }
+    .option-name { font-size: .88rem; line-height: 1.25; word-break: break-word; }
+    .switch { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; background: #303748; border-radius: 999px; transition: .2s;
+    }
+    .slider:before {
+      content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px;
+      background: white; border-radius: 50%; transition: .2s;
+    }
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider:before { transform: translateX(20px); }
+    .num-input { width: 92px; padding: 8px 10px; font-size: .9rem; }
+    .hidden { display: none !important; }
+    .msg { font-size: .85rem; margin-top: 8px; color: var(--muted); }
+    .msg.error { color: var(--err); }
+    .msg.ok { color: var(--ok); }
+    .bottom-bar {
+      position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+      background: rgba(10,12,16,.95); border-top: 1px solid var(--stroke);
+      display: flex; gap: 10px; justify-content: center;
+    }
+    .pill { font-size: .75rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="brand">
+      <img src="https://i.imgur.com/Nuy61wA.png" alt="Falcao" />
+      <div>
+        <h1>Falcao Remote Panel</h1>
+        <p>Controla tu external desde el movil</p>
+      </div>
+    </div>
+
+    <section id="loginView" class="card">
+      <label for="licenseKey">License Key</label>
+      <input id="licenseKey" type="text" placeholder="FALCAO-EXTERNAL-XXXXXX-XXXXXXX" autocomplete="off" />
+      <div class="row" style="margin-top:12px">
+        <button id="loginBtn" type="button">Conectar panel</button>
+      </div>
+      <p id="loginMsg" class="msg"></p>
+      <p class="pill" style="margin-top:10px">Necesitas tener FiveM + external abiertos en tu PC con la misma key.</p>
+    </section>
+
+    <section id="panelView" class="hidden">
+      <div class="card status">
+        <div>
+          <strong id="keyMasked">—</strong>
+          <div class="pill" id="syncInfo">Esperando sync...</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="onlineLabel">Offline</span>
+          <span id="onlineDot" class="dot"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Configs</div>
+        <div class="row">
+          <select id="configSelect"></select>
+          <button class="secondary" id="loadConfigBtn" type="button">Cargar</button>
+          <button class="secondary" id="saveConfigBtn" type="button">Guardar</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <input id="newConfigName" type="text" placeholder="Nuevo nombre config" />
+          <button class="ghost" id="saveAsConfigBtn" type="button">Guardar como</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input id="searchInput" type="text" placeholder="Buscar opcion..." />
+        <button class="secondary" id="logoutBtn" type="button">Salir</button>
+      </div>
+
+      <div class="tabs" id="categoryTabs"></div>
+      <div id="optionsContainer"></div>
+    </section>
+  </div>
+
+  <div class="bottom-bar hidden" id="bottomBar">
+    <button class="secondary" id="refreshBtn" type="button">Actualizar</button>
+  </div>
+
+  <script>
+    const API = "";
+    const STORAGE_KEY = "falcao_panel_token";
+    let webToken = localStorage.getItem(STORAGE_KEY) || "";
+    let allItems = [];
+    let activeCategory = "Todos";
+    let pollTimer = null;
+    let pendingUpdates = new Map();
+
+    const CATEGORY_RULES = [
+      { id: "Aimbot", test: n => /^abt_|^VisibleCheck$|^misc_localplayer_showaimbot|^misc_aimbot|^misc_aimbotline/.test(n) },
+      { id: "Silent Aim", test: n => /^slt_|^VisibleCheck_silent|^misc_localplayer_showsilent|^misc_silentfov/.test(n) },
+      { id: "Magic Bullet", test: n => /^magic_|^misc_localplayer_showmagic|^misc_magicfov/.test(n) },
+      { id: "Trigger", test: n => /^trg_|^misc_localplayer_showtrigger|^misc_triggerfov/.test(n) },
+      { id: "ESP Players", test: n => /^esp_players_|^esp_FriendsColor/.test(n) },
+      { id: "ESP Radar", test: n => /^esp_radar_/.test(n) },
+      { id: "ESP Vehicles", test: n => /^esp_vehicles_/.test(n) },
+      { id: "Exploits", test: n => /^(God|Noclip|wpn_|veh_|macro_)/.test(n) },
+      { id: "Screen / FOV", test: n => /^misc_localplayer_|^misc_.*fovcol|^misc_.*linecol/.test(n) },
+      { id: "General", test: n => /^(thd_|ui_|safe_|capt|gpu_|second_|hide_|menu_|hud_|qb_|mnkey|login_)/.test(n) },
+      { id: "Otros", test: () => true }
+    ];
+
+    function humanize(name) {
+      return name
+        .replace(/_/g, " ")
+        .replace(/co(\d)$/i, " ch$1")
+        .replace(/col(\d)$/i, " ch$1")
+        .replace(/\b(abt|slt|trg|esp|wpn|veh|misc|qb|mnkey)\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim() || name;
+    }
+
+    function categorize(name) {
+      for (const rule of CATEGORY_RULES) {
+        if (rule.test(name)) return rule.id;
+      }
+      return "Otros";
+    }
+
+    async function api(path, options = {}) {
+      const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+      if (webToken) headers["x-panel-web-token"] = webToken;
+      const res = await fetch(API + path, Object.assign({}, options, { headers }));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Request failed");
+      return data;
+    }
+
+    function setLoginMessage(text, type = "") {
+      const el = document.getElementById("loginMsg");
+      el.textContent = text || "";
+      el.className = "msg" + (type ? " " + type : "");
+    }
+
+    function showPanel(show) {
+      document.getElementById("loginView").classList.toggle("hidden", show);
+      document.getElementById("panelView").classList.toggle("hidden", !show);
+      document.getElementById("bottomBar").classList.toggle("hidden", !show);
+    }
+
+    async function login() {
+      const key = document.getElementById("licenseKey").value.trim();
+      if (!key) {
+        setLoginMessage("Introduce tu key.", "error");
+        return;
+      }
+      setLoginMessage("Conectando...");
+      try {
+        const data = await api("/api/panel/web/login", {
+          method: "POST",
+          body: JSON.stringify({ key })
+        });
+        webToken = data.webToken;
+        localStorage.setItem(STORAGE_KEY, webToken);
+        setLoginMessage("");
+        showPanel(true);
+        await refreshStatus(true);
+        startPolling();
+      } catch (err) {
+        setLoginMessage(err.message, "error");
+      }
+    }
+
+    async function logout() {
+      try { await api("/api/panel/web/logout", { method: "POST", body: "{}" }); } catch (_) {}
+      webToken = "";
+      localStorage.removeItem(STORAGE_KEY);
+      stopPolling();
+      showPanel(false);
+    }
+
+    function stopPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    function startPolling() {
+      stopPolling();
+      pollTimer = setInterval(() => refreshStatus(false), 1500);
+    }
+
+    async function refreshStatus(forceRender) {
+      try {
+        const data = await api("/api/panel/web/status");
+        document.getElementById("keyMasked").textContent = data.keyMasked || "—";
+        const online = !!data.clientOnline;
+        document.getElementById("onlineDot").classList.toggle("online", online);
+        document.getElementById("onlineLabel").textContent = online ? "Online" : "Offline";
+        document.getElementById("syncInfo").textContent = data.lastClientSeen
+          ? "Ultimo sync: " + new Date(data.lastClientSeen).toLocaleTimeString()
+          : "Sin sync";
+
+        const items = (data.state && data.state.items) || [];
+        const configs = (data.state && data.state.meta && data.state.meta.configs) || [];
+        updateConfigSelect(configs);
+
+        const changed = JSON.stringify(items) !== JSON.stringify(allItems);
+        allItems = items;
+        if (forceRender || changed) renderOptions();
+      } catch (err) {
+        if (String(err.message).includes("Sesion")) logout();
+      }
+    }
+
+    function updateConfigSelect(configs) {
+      const sel = document.getElementById("configSelect");
+      const current = sel.value;
+      sel.innerHTML = "";
+      for (const name of configs) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+      }
+      if (current && configs.includes(current)) sel.value = current;
+    }
+
+    async function sendCommand(command) {
+      await api("/api/panel/web/command", {
+        method: "POST",
+        body: JSON.stringify(command)
+      });
+    }
+
+    async function setOption(name, value) {
+      pendingUpdates.set(name, value);
+      const local = allItems.find(i => i.name === name);
+      if (local) local.value = value;
+      renderOptions();
+      try {
+        await sendCommand({ type: "option", name, value });
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        pendingUpdates.delete(name);
+      }
+    }
+
+    async function configAction(action, configName) {
+      if (!configName) return alert("Nombre de config requerido");
+      await sendCommand({ type: action, configName });
+      setTimeout(() => refreshStatus(true), 900);
+    }
+
+    function renderTabs(categories) {
+      const tabs = document.getElementById("categoryTabs");
+      tabs.innerHTML = "";
+      const list = ["Todos", ...categories];
+      for (const cat of list) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tab" + (cat === activeCategory ? " active" : "");
+        btn.textContent = cat;
+        btn.onclick = () => { activeCategory = cat; renderOptions(); };
+        tabs.appendChild(btn);
+      }
+    }
+
+    function renderOptions() {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const container = document.getElementById("optionsContainer");
+      container.innerHTML = "";
+
+      const grouped = new Map();
+      for (const item of allItems) {
+        const cat = categorize(item.name);
+        if (!grouped.has(cat)) grouped.set(cat, []);
+        grouped.get(cat).push(item);
+      }
+
+      renderTabs([...grouped.keys()]);
+
+      for (const [cat, items] of grouped.entries()) {
+        if (activeCategory !== "Todos" && activeCategory !== cat) continue;
+
+        const filtered = items.filter(it => {
+          if (!q) return true;
+          const label = humanize(it.name).toLowerCase();
+          return it.name.toLowerCase().includes(q) || label.includes(q);
+        });
+        if (!filtered.length) continue;
+
+        const card = document.createElement("div");
+        card.className = "card";
+        const title = document.createElement("div");
+        title.className = "section-title";
+        title.textContent = cat;
+        card.appendChild(title);
+
+        for (const item of filtered.sort((a, b) => a.name.localeCompare(b.name))) {
+          const row = document.createElement("div");
+          row.className = "option";
+          const label = document.createElement("div");
+          label.className = "option-name";
+          label.textContent = humanize(item.name);
+          row.appendChild(label);
+
+          if (item.type === "bool") {
+            const wrap = document.createElement("label");
+            wrap.className = "switch";
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.checked = !!item.value;
+            input.onchange = () => setOption(item.name, input.checked);
+            const span = document.createElement("span");
+            span.className = "slider";
+            wrap.appendChild(input);
+            wrap.appendChild(span);
+            row.appendChild(wrap);
+          } else {
+            const input = document.createElement("input");
+            input.className = "num-input";
+            input.type = "number";
+            input.step = item.type === "float" ? "0.01" : "1";
+            input.value = item.value;
+            input.onchange = () => {
+              const val = item.type === "float" ? parseFloat(input.value) : parseInt(input.value, 10);
+              if (Number.isNaN(val)) return;
+              setOption(item.name, val);
+            };
+            row.appendChild(input);
+          }
+          card.appendChild(row);
+        }
+        container.appendChild(card);
+      }
+    }
+
+    document.getElementById("loginBtn").onclick = login;
+    document.getElementById("logoutBtn").onclick = logout;
+    document.getElementById("refreshBtn").onclick = () => refreshStatus(true);
+    document.getElementById("searchInput").oninput = renderOptions;
+    document.getElementById("loadConfigBtn").onclick = () => configAction("load_config", document.getElementById("configSelect").value);
+    document.getElementById("saveConfigBtn").onclick = () => configAction("save_config", document.getElementById("configSelect").value);
+    document.getElementById("saveAsConfigBtn").onclick = () => configAction("save_config", document.getElementById("newConfigName").value.trim());
+
+    (async function bootstrap() {
+      if (webToken) {
+        showPanel(true);
+        try {
+          await refreshStatus(true);
+          startPolling();
+        } catch (_) {
+          showPanel(false);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
