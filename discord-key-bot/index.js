@@ -13,6 +13,7 @@ const {
   AttachmentBuilder
 } = require("discord.js");
 
+const { mountPanelApi } = require("./panel");
 const TOKEN = process.env.DISCORD_TOKEN;
 const PREFIX = process.env.PREFIX || "!";
 const API_PORT = Number(process.env.PORT || process.env.API_PORT || 3000);
@@ -784,6 +785,15 @@ app.post("/api/license/validate", (req, res) => {
     expiresAt: result.key.expiresAt,
     firstLoginAt: result.key.firstLoginAt
   });
+});
+
+mountPanelApi(app, {
+  express,
+  normalizeKey,
+  getKeyRecord,
+  readDb,
+  writeDb,
+  getClientIp
 });
 
 const client = new Client({
