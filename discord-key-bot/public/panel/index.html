@@ -4,425 +4,369 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#111318" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Falcao Remote Panel</title>
   <style>
-    :root {
-      --bg: #0f1116;
-      --card: #171a22;
-      --stroke: #2a3040;
-      --text: #eef1f7;
-      --muted: #9aa3b5;
-      --accent: #ff8a33;
-      --accent-dim: rgba(255, 138, 51, 0.15);
-      --ok: #3ecf6a;
-      --err: #ff5d5d;
-      --radius: 14px;
+    :root { --bg:#0f1116; --card:#171a22; --stroke:#2a3040; --text:#eef1f7; --muted:#9aa3b5; --accent:#ff8a33; --accent-dim:rgba(255,138,51,.14); --ok:#3ecf6a; --err:#ff5d5d; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,Segoe UI,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; }
+    .hidden { display:none !important; }
+    .app { max-width:860px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column; }
+    .top { padding:14px 14px 8px; border-bottom:1px solid var(--stroke); background:#12151c; position:sticky; top:0; z-index:10; }
+    .brand { display:flex; gap:10px; align-items:center; }
+    .brand img { width:38px; height:38px; border-radius:10px; }
+    .brand h1 { margin:0; font-size:1rem; }
+    .brand p { margin:2px 0 0; color:var(--muted); font-size:.78rem; }
+    .status-row { display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:.85rem; }
+    .dot { width:9px; height:9px; border-radius:50%; background:var(--err); display:inline-block; margin-left:6px; }
+    .dot.on { background:var(--ok); box-shadow:0 0 8px rgba(62,207,106,.5); }
+    .login { padding:16px; }
+    .card { background:var(--card); border:1px solid var(--stroke); border-radius:14px; padding:14px; margin-bottom:12px; }
+    label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; }
+    input, select, button { font:inherit; }
+    input[type=text], input[type=password], input[type=number], select {
+      width:100%; padding:11px 12px; border-radius:12px; border:1px solid var(--stroke); background:#0d1017; color:var(--text);
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Inter, Segoe UI, system-ui, sans-serif;
-      background: radial-gradient(circle at top, #1a2030 0%, var(--bg) 45%);
-      color: var(--text);
-      min-height: 100dvh;
-    }
-    .app { max-width: 720px; margin: 0 auto; padding: 16px 14px 96px; }
-    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-    .brand img { width: 42px; height: 42px; border-radius: 10px; }
-    .brand h1 { font-size: 1.15rem; margin: 0; }
-    .brand p { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--stroke);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 14px;
-    }
-    .status {
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      font-size: 0.9rem;
-    }
-    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--err); box-shadow: 0 0 10px rgba(255,93,93,.45); }
-    .dot.online { background: var(--ok); box-shadow: 0 0 10px rgba(62,207,106,.45); }
-    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
-    input[type="text"], input[type="number"], input[type="password"], select {
-      width: 100%; padding: 12px 14px; border-radius: 12px;
-      border: 1px solid var(--stroke); background: #0d1017; color: var(--text);
-      font-size: 1rem;
-    }
-    button {
-      border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 600;
-      background: var(--accent); color: #111; cursor: pointer;
-    }
-    button.secondary { background: #252b39; color: var(--text); }
-    button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--stroke); }
-    button:disabled { opacity: .55; cursor: not-allowed; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .row > * { flex: 1; min-width: 120px; }
-    .toolbar { display: flex; gap: 8px; margin-bottom: 12px; position: sticky; top: 0; z-index: 5; background: rgba(15,17,22,.92); backdrop-filter: blur(8px); padding: 8px 0; }
-    .toolbar input { flex: 1; }
-    .tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
-    .tab {
-      white-space: nowrap; padding: 8px 12px; border-radius: 999px;
-      border: 1px solid var(--stroke); color: var(--muted); background: transparent; font-size: .85rem;
-    }
-    .tab.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(255,138,51,.35); }
-    .section-title { font-size: .95rem; margin: 0 0 10px; color: var(--accent); }
-    .option {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.04);
-    }
-    .option:last-child { border-bottom: 0; }
-    .option-name { font-size: .88rem; line-height: 1.25; word-break: break-word; }
-    .switch { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; inset: 0; background: #303748; border-radius: 999px; transition: .2s;
-    }
-    .slider:before {
-      content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px;
-      background: white; border-radius: 50%; transition: .2s;
-    }
-    .switch input:checked + .slider { background: var(--accent); }
-    .switch input:checked + .slider:before { transform: translateX(20px); }
-    .num-input { width: 92px; padding: 8px 10px; font-size: .9rem; }
-    .hidden { display: none !important; }
-    .msg { font-size: .85rem; margin-top: 8px; color: var(--muted); }
-    .msg.error { color: var(--err); }
-    .msg.ok { color: var(--ok); }
-    .bottom-bar {
-      position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
-      background: rgba(10,12,16,.95); border-top: 1px solid var(--stroke);
-      display: flex; gap: 10px; justify-content: center;
-    }
-    .pill { font-size: .75rem; color: var(--muted); }
+    button { border:0; border-radius:12px; padding:11px 14px; font-weight:600; background:var(--accent); color:#111; cursor:pointer; }
+    button.secondary { background:#252b39; color:var(--text); }
+    button.ghost { background:transparent; border:1px solid var(--stroke); color:var(--muted); }
+    button.full { width:100%; }
+    .msg { font-size:.84rem; color:var(--muted); margin-top:8px; }
+    .msg.err { color:var(--err); }
+    .layout { display:flex; flex:1; min-height:0; }
+    .sidebar { width:118px; border-right:1px solid var(--stroke); background:#12151c; overflow-y:auto; padding:8px 6px 80px; flex-shrink:0; }
+    .cat-title { font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding:8px 6px 4px; }
+    .nav-btn { width:100%; text-align:left; background:transparent; color:var(--muted); border:0; border-radius:10px; padding:8px 8px; font-size:.78rem; margin-bottom:4px; }
+    .nav-btn.active { background:var(--accent-dim); color:var(--accent); }
+    .main { flex:1; overflow-y:auto; padding:12px 12px 90px; }
+    .section-title { font-size:1rem; color:var(--accent); margin:0 0 10px; }
+    .group-title { font-size:.86rem; color:var(--text); margin:0 0 8px; opacity:.9; }
+    .option { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+    .option:last-child { border-bottom:0; }
+    .option label { margin:0; color:var(--text); font-size:.86rem; flex:1; }
+    .switch { position:relative; width:46px; height:26px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; inset:0; background:#303748; border-radius:999px; transition:.2s; }
+    .slider:before { content:""; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .switch input:checked + .slider { background:var(--accent); }
+    .switch input:checked + .slider:before { transform:translateX(20px); }
+    .num { width:88px; padding:7px 8px; font-size:.85rem; border-radius:10px; border:1px solid var(--stroke); background:#0d1017; color:var(--text); }
+    .bottom { position:fixed; left:0; right:0; bottom:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(10,12,16,.96); border-top:1px solid var(--stroke); display:flex; gap:8px; justify-content:center; }
+    .note { color:var(--muted); font-size:.82rem; line-height:1.4; }
+    .cloud-badge { display:inline-block; font-size:.68rem; background:var(--accent-dim); color:var(--accent); padding:3px 8px; border-radius:999px; margin-top:6px; }
   </style>
 </head>
 <body>
   <div class="app">
-    <div class="brand">
-      <img src="https://i.imgur.com/Nuy61wA.png" alt="Falcao" />
-      <div>
-        <h1>Falcao Remote Panel</h1>
-        <p>Controla tu external desde el movil</p>
+    <div class="top">
+      <div class="brand">
+        <img src="https://i.imgur.com/Nuy61wA.png" alt="Falcao" />
+        <div>
+          <h1>Falcao Remote Panel</h1>
+          <p>Panel en la nube — control remoto de tu PC</p>
+          <span class="cloud-badge">No es archivo local · Conexion via bot</span>
+        </div>
+      </div>
+      <div id="statusRow" class="status-row hidden">
+        <span id="keyMasked">—</span>
+        <span><span id="onlineLabel">Offline</span><span id="onlineDot" class="dot"></span></span>
       </div>
     </div>
 
-    <section id="loginView" class="card">
-      <label for="licenseKey">License Key</label>
-      <input id="licenseKey" type="text" placeholder="FALCAO-EXTERNAL-XXXXXX-XXXXXXX" autocomplete="off" />
-      <div class="row" style="margin-top:12px">
-        <button id="loginBtn" type="button">Conectar panel</button>
+    <section id="loginView" class="login">
+      <div class="card">
+        <label for="licenseKey">License Key</label>
+        <input id="licenseKey" type="text" placeholder="FALCAO-EXTERNAL-XXXXXX-XXXXXXX" autocomplete="off" />
+        <button id="loginBtn" class="full" type="button" style="margin-top:12px">Conectar panel</button>
+        <p id="loginMsg" class="msg"></p>
+        <p class="note" style="margin-top:10px">1) Abre FiveM + external en tu PC y haz login.<br>2) Entra aqui con la misma key.<br>3) En PC no veras el menu — solo visuals/FOV activados.</p>
       </div>
-      <p id="loginMsg" class="msg"></p>
-      <p class="pill" style="margin-top:10px">Necesitas tener FiveM + external abiertos en tu PC con la misma key.</p>
     </section>
 
-    <section id="panelView" class="hidden">
-      <div class="card status">
-        <div>
-          <strong id="keyMasked">—</strong>
-          <div class="pill" id="syncInfo">Esperando sync...</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="onlineLabel">Offline</span>
-          <span id="onlineDot" class="dot"></span>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="section-title">Configs</div>
-        <div class="row">
-          <select id="configSelect"></select>
+    <section id="panelView" class="hidden" style="flex:1;display:flex;flex-direction:column;min-height:0">
+      <div class="card" style="margin:10px 12px 0">
+        <div class="group-title">Configs</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="configSelect" style="flex:1;min-width:120px"></select>
           <button class="secondary" id="loadConfigBtn" type="button">Cargar</button>
           <button class="secondary" id="saveConfigBtn" type="button">Guardar</button>
         </div>
-        <div class="row" style="margin-top:10px">
-          <input id="newConfigName" type="text" placeholder="Nuevo nombre config" />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="newConfigName" type="text" placeholder="Nuevo nombre config" style="flex:1" />
           <button class="ghost" id="saveAsConfigBtn" type="button">Guardar como</button>
         </div>
       </div>
-
-      <div class="toolbar">
-        <input id="searchInput" type="text" placeholder="Buscar opcion..." />
-        <button class="secondary" id="logoutBtn" type="button">Salir</button>
+      <div class="layout">
+        <nav class="sidebar" id="sidebar"></nav>
+        <main class="main" id="mainPanel"></main>
       </div>
-
-      <div class="tabs" id="categoryTabs"></div>
-      <div id="optionsContainer"></div>
     </section>
   </div>
 
-  <div class="bottom-bar hidden" id="bottomBar">
+  <div class="bottom hidden" id="bottomBar">
     <button class="secondary" id="refreshBtn" type="button">Actualizar</button>
+    <button class="ghost" id="logoutBtn" type="button">Salir</button>
   </div>
 
   <script>
-    const API = "";
     const STORAGE_KEY = "falcao_panel_token";
+    const LANG = "es";
     let webToken = localStorage.getItem(STORAGE_KEY) || "";
-    let allItems = [];
-    let activeCategory = "Todos";
+    let schema = null;
+    let stateMap = new Map();
+    let activeSection = 0;
     let pollTimer = null;
-    let pendingUpdates = new Map();
-
-    const CATEGORY_RULES = [
-      { id: "Aimbot", test: n => /^abt_|^VisibleCheck$|^misc_localplayer_showaimbot|^misc_aimbot|^misc_aimbotline/.test(n) },
-      { id: "Silent Aim", test: n => /^slt_|^VisibleCheck_silent|^misc_localplayer_showsilent|^misc_silentfov/.test(n) },
-      { id: "Magic Bullet", test: n => /^magic_|^misc_localplayer_showmagic|^misc_magicfov/.test(n) },
-      { id: "Trigger", test: n => /^trg_|^misc_localplayer_showtrigger|^misc_triggerfov/.test(n) },
-      { id: "ESP Players", test: n => /^esp_players_|^esp_FriendsColor/.test(n) },
-      { id: "ESP Radar", test: n => /^esp_radar_/.test(n) },
-      { id: "ESP Vehicles", test: n => /^esp_vehicles_/.test(n) },
-      { id: "Exploits", test: n => /^(God|Noclip|wpn_|veh_|macro_)/.test(n) },
-      { id: "Screen / FOV", test: n => /^misc_localplayer_|^misc_.*fovcol|^misc_.*linecol/.test(n) },
-      { id: "General", test: n => /^(thd_|ui_|safe_|capt|gpu_|second_|hide_|menu_|hud_|qb_|mnkey|login_)/.test(n) },
-      { id: "Otros", test: () => true }
-    ];
-
-    function humanize(name) {
-      return name
-        .replace(/_/g, " ")
-        .replace(/co(\d)$/i, " ch$1")
-        .replace(/col(\d)$/i, " ch$1")
-        .replace(/\b(abt|slt|trg|esp|wpn|veh|misc|qb|mnkey)\b/gi, "")
-        .replace(/\s+/g, " ")
-        .trim() || name;
-    }
-
-    function categorize(name) {
-      for (const rule of CATEGORY_RULES) {
-        if (rule.test(name)) return rule.id;
-      }
-      return "Otros";
-    }
 
     async function api(path, options = {}) {
       const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
       if (webToken) headers["x-panel-web-token"] = webToken;
-      const res = await fetch(API + path, Object.assign({}, options, { headers }));
+      const res = await fetch(path, Object.assign({}, options, { headers }));
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Request failed");
+      if (!res.ok) throw new Error(data.message || "Error de conexion");
       return data;
     }
 
-    function setLoginMessage(text, type = "") {
-      const el = document.getElementById("loginMsg");
-      el.textContent = text || "";
-      el.className = "msg" + (type ? " " + type : "");
-    }
+    function t(obj) { return (obj && (obj[LANG] || obj.en)) || ""; }
 
     function showPanel(show) {
       document.getElementById("loginView").classList.toggle("hidden", show);
       document.getElementById("panelView").classList.toggle("hidden", !show);
       document.getElementById("bottomBar").classList.toggle("hidden", !show);
+      document.getElementById("statusRow").classList.toggle("hidden", !show);
+      if (show) document.getElementById("panelView").style.display = "flex";
     }
 
-    async function login() {
-      const key = document.getElementById("licenseKey").value.trim();
-      if (!key) {
-        setLoginMessage("Introduce tu key.", "error");
+    function setLoginMsg(text, err) {
+      const el = document.getElementById("loginMsg");
+      el.textContent = text || "";
+      el.className = "msg" + (err ? " err" : "");
+    }
+
+    function rebuildStateMap(items) {
+      stateMap = new Map();
+      for (const it of items || []) stateMap.set(it.name, it);
+    }
+
+    function getValue(key, fallback) {
+      const it = stateMap.get(key);
+      return it ? it.value : fallback;
+    }
+
+    async function loadSchema() {
+      const data = await api("/api/panel/schema");
+      schema = data.schema;
+    }
+
+    function renderSidebar() {
+      const nav = document.getElementById("sidebar");
+      nav.innerHTML = "";
+      for (const cat of schema.categories) {
+        const title = document.createElement("div");
+        title.className = "cat-title";
+        title.textContent = t(cat);
+        nav.appendChild(title);
+        for (const sid of cat.sections) {
+          const sec = schema.sections.find(s => s.id === sid);
+          if (!sec) continue;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "nav-btn" + (activeSection === sid ? " active" : "");
+          btn.textContent = t(sec);
+          btn.onclick = () => { activeSection = sid; renderSidebar(); renderSection(); };
+          nav.appendChild(btn);
+        }
+      }
+      for (const sec of schema.pcOnlySections || []) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "nav-btn" + (activeSection === sec.id ? " active" : "");
+        btn.textContent = t(sec) + " *";
+        btn.onclick = () => { activeSection = sec.id; renderSidebar(); renderSection(); };
+        nav.appendChild(btn);
+      }
+    }
+
+    function renderSection() {
+      const main = document.getElementById("mainPanel");
+      main.innerHTML = "";
+      const pc = (schema.pcOnlySections || []).find(s => s.id === activeSection);
+      if (pc) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<div class="section-title">${t(pc)}</div><p class="note">${t(pc.note)}</p>`;
+        main.appendChild(card);
         return;
       }
-      setLoginMessage("Conectando...");
-      try {
-        const data = await api("/api/panel/web/login", {
-          method: "POST",
-          body: JSON.stringify({ key })
+      const sec = schema.sections.find(s => s.id === activeSection);
+      if (!sec) return;
+      const h = document.createElement("h2");
+      h.className = "section-title";
+      h.textContent = t(sec);
+      main.appendChild(h);
+      for (const group of sec.groups) {
+        const card = document.createElement("div");
+        card.className = "card";
+        const gt = document.createElement("div");
+        gt.className = "group-title";
+        gt.textContent = t(group);
+        card.appendChild(gt);
+        for (const entry of group.items || []) {
+          if (entry.kind === "action") card.appendChild(renderAction(entry));
+          else card.appendChild(renderOption(entry));
+        }
+        main.appendChild(card);
+      }
+    }
+
+    function renderAction(entry) {
+      const row = document.createElement("div");
+      row.className = "option";
+      const label = document.createElement("label");
+      label.textContent = t(entry.label);
+      const btn = document.createElement("button");
+      btn.className = "secondary";
+      btn.type = "button";
+      btn.textContent = "Ejecutar";
+      btn.onclick = async () => {
+        try { await api("/api/panel/web/command", { method:"POST", body: JSON.stringify(entry.command) }); }
+        catch (e) { alert(e.message); }
+      };
+      row.appendChild(label);
+      row.appendChild(btn);
+      return row;
+    }
+
+    function renderOption(entry) {
+      const row = document.createElement("div");
+      row.className = "option";
+      const label = document.createElement("label");
+      label.textContent = t(entry.label);
+      row.appendChild(label);
+      const val = getValue(entry.key, entry.kind === "bool" ? false : 0);
+      if (entry.kind === "bool") {
+        const wrap = document.createElement("label");
+        wrap.className = "switch";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = !!val;
+        input.onchange = () => setOption(entry.key, input.checked);
+        const span = document.createElement("span");
+        span.className = "slider";
+        wrap.appendChild(input);
+        wrap.appendChild(span);
+        row.appendChild(wrap);
+      } else if (entry.options) {
+        const sel = document.createElement("select");
+        sel.className = "num";
+        const opts = entry.options[LANG] || entry.options.en || [];
+        opts.forEach((text, idx) => {
+          const o = document.createElement("option");
+          o.value = idx;
+          o.textContent = text;
+          sel.appendChild(o);
         });
-        webToken = data.webToken;
-        localStorage.setItem(STORAGE_KEY, webToken);
-        setLoginMessage("");
-        showPanel(true);
-        await refreshStatus(true);
-        startPolling();
-      } catch (err) {
-        setLoginMessage(err.message, "error");
+        sel.value = String(parseInt(val, 10) || 0);
+        sel.onchange = () => setOption(entry.key, parseInt(sel.value, 10));
+        row.appendChild(sel);
+      } else {
+        const input = document.createElement("input");
+        input.className = "num";
+        input.type = "number";
+        input.step = entry.step || (entry.kind === "float" ? "0.01" : "1");
+        if (entry.min != null) input.min = entry.min;
+        if (entry.max != null) input.max = entry.max;
+        input.value = val;
+        input.onchange = () => {
+          const v = entry.kind === "float" ? parseFloat(input.value) : parseInt(input.value, 10);
+          if (!Number.isNaN(v)) setOption(entry.key, v);
+        };
+        row.appendChild(input);
       }
-    }
-
-    async function logout() {
-      try { await api("/api/panel/web/logout", { method: "POST", body: "{}" }); } catch (_) {}
-      webToken = "";
-      localStorage.removeItem(STORAGE_KEY);
-      stopPolling();
-      showPanel(false);
-    }
-
-    function stopPolling() {
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = null;
-    }
-
-    function startPolling() {
-      stopPolling();
-      pollTimer = setInterval(() => refreshStatus(false), 1500);
-    }
-
-    async function refreshStatus(forceRender) {
-      try {
-        const data = await api("/api/panel/web/status");
-        document.getElementById("keyMasked").textContent = data.keyMasked || "—";
-        const online = !!data.clientOnline;
-        document.getElementById("onlineDot").classList.toggle("online", online);
-        document.getElementById("onlineLabel").textContent = online ? "Online" : "Offline";
-        document.getElementById("syncInfo").textContent = data.lastClientSeen
-          ? "Ultimo sync: " + new Date(data.lastClientSeen).toLocaleTimeString()
-          : "Sin sync";
-
-        const items = (data.state && data.state.items) || [];
-        const configs = (data.state && data.state.meta && data.state.meta.configs) || [];
-        updateConfigSelect(configs);
-
-        const changed = JSON.stringify(items) !== JSON.stringify(allItems);
-        allItems = items;
-        if (forceRender || changed) renderOptions();
-      } catch (err) {
-        if (String(err.message).includes("Sesion")) logout();
-      }
-    }
-
-    function updateConfigSelect(configs) {
-      const sel = document.getElementById("configSelect");
-      const current = sel.value;
-      sel.innerHTML = "";
-      for (const name of configs) {
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name;
-        sel.appendChild(opt);
-      }
-      if (current && configs.includes(current)) sel.value = current;
-    }
-
-    async function sendCommand(command) {
-      await api("/api/panel/web/command", {
-        method: "POST",
-        body: JSON.stringify(command)
-      });
+      return row;
     }
 
     async function setOption(name, value) {
-      pendingUpdates.set(name, value);
-      const local = allItems.find(i => i.name === name);
-      if (local) local.value = value;
-      renderOptions();
+      const local = stateMap.get(name) || { name, type: typeof value === "boolean" ? "bool" : (Number.isInteger(value) ? "int" : "float") };
+      local.value = value;
+      stateMap.set(name, local);
       try {
-        await sendCommand({ type: "option", name, value });
-      } catch (err) {
-        alert(err.message);
-      } finally {
-        pendingUpdates.delete(name);
-      }
+        await api("/api/panel/web/command", { method:"POST", body: JSON.stringify({ type:"option", name, value }) });
+      } catch (e) { alert(e.message); }
     }
 
     async function configAction(action, configName) {
       if (!configName) return alert("Nombre de config requerido");
-      await sendCommand({ type: action, configName });
-      setTimeout(() => refreshStatus(true), 900);
+      await api("/api/panel/web/command", { method:"POST", body: JSON.stringify({ type: action, configName }) });
+      setTimeout(refreshStatus, 900);
     }
 
-    function renderTabs(categories) {
-      const tabs = document.getElementById("categoryTabs");
-      tabs.innerHTML = "";
-      const list = ["Todos", ...categories];
-      for (const cat of list) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "tab" + (cat === activeCategory ? " active" : "");
-        btn.textContent = cat;
-        btn.onclick = () => { activeCategory = cat; renderOptions(); };
-        tabs.appendChild(btn);
+    async function refreshStatus() {
+      const data = await api("/api/panel/web/status");
+      document.getElementById("keyMasked").textContent = data.keyMasked || "—";
+      const online = !!data.clientOnline;
+      document.getElementById("onlineDot").classList.toggle("on", online);
+      document.getElementById("onlineLabel").textContent = online ? "Online" : "Offline";
+      rebuildStateMap((data.state && data.state.items) || []);
+      const configs = (data.state && data.state.meta && data.state.meta.configs) || [];
+      const sel = document.getElementById("configSelect");
+      const cur = sel.value;
+      sel.innerHTML = "";
+      for (const name of configs) {
+        const opt = document.createElement("option");
+        opt.value = name; opt.textContent = name;
+        sel.appendChild(opt);
+      }
+      if (cur && configs.includes(cur)) sel.value = cur;
+      renderSection();
+    }
+
+    async function login() {
+      const key = document.getElementById("licenseKey").value.trim();
+      if (!key) return setLoginMsg("Introduce tu key.", true);
+      setLoginMsg("Conectando...");
+      try {
+        await loadSchema();
+        const data = await api("/api/panel/web/login", { method:"POST", body: JSON.stringify({ key }) });
+        webToken = data.webToken;
+        localStorage.setItem(STORAGE_KEY, webToken);
+        setLoginMsg("");
+        showPanel(true);
+        renderSidebar();
+        renderSection();
+        await refreshStatus();
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(refreshStatus, 1500);
+      } catch (e) {
+        setLoginMsg(e.message, true);
       }
     }
 
-    function renderOptions() {
-      const q = document.getElementById("searchInput").value.trim().toLowerCase();
-      const container = document.getElementById("optionsContainer");
-      container.innerHTML = "";
-
-      const grouped = new Map();
-      for (const item of allItems) {
-        const cat = categorize(item.name);
-        if (!grouped.has(cat)) grouped.set(cat, []);
-        grouped.get(cat).push(item);
-      }
-
-      renderTabs([...grouped.keys()]);
-
-      for (const [cat, items] of grouped.entries()) {
-        if (activeCategory !== "Todos" && activeCategory !== cat) continue;
-
-        const filtered = items.filter(it => {
-          if (!q) return true;
-          const label = humanize(it.name).toLowerCase();
-          return it.name.toLowerCase().includes(q) || label.includes(q);
-        });
-        if (!filtered.length) continue;
-
-        const card = document.createElement("div");
-        card.className = "card";
-        const title = document.createElement("div");
-        title.className = "section-title";
-        title.textContent = cat;
-        card.appendChild(title);
-
-        for (const item of filtered.sort((a, b) => a.name.localeCompare(b.name))) {
-          const row = document.createElement("div");
-          row.className = "option";
-          const label = document.createElement("div");
-          label.className = "option-name";
-          label.textContent = humanize(item.name);
-          row.appendChild(label);
-
-          if (item.type === "bool") {
-            const wrap = document.createElement("label");
-            wrap.className = "switch";
-            const input = document.createElement("input");
-            input.type = "checkbox";
-            input.checked = !!item.value;
-            input.onchange = () => setOption(item.name, input.checked);
-            const span = document.createElement("span");
-            span.className = "slider";
-            wrap.appendChild(input);
-            wrap.appendChild(span);
-            row.appendChild(wrap);
-          } else {
-            const input = document.createElement("input");
-            input.className = "num-input";
-            input.type = "number";
-            input.step = item.type === "float" ? "0.01" : "1";
-            input.value = item.value;
-            input.onchange = () => {
-              const val = item.type === "float" ? parseFloat(input.value) : parseInt(input.value, 10);
-              if (Number.isNaN(val)) return;
-              setOption(item.name, val);
-            };
-            row.appendChild(input);
-          }
-          card.appendChild(row);
-        }
-        container.appendChild(card);
-      }
+    async function logout() {
+      try { await api("/api/panel/web/logout", { method:"POST", body:"{}" }); } catch (_) {}
+      webToken = "";
+      localStorage.removeItem(STORAGE_KEY);
+      if (pollTimer) clearInterval(pollTimer);
+      showPanel(false);
     }
 
     document.getElementById("loginBtn").onclick = login;
     document.getElementById("logoutBtn").onclick = logout;
-    document.getElementById("refreshBtn").onclick = () => refreshStatus(true);
-    document.getElementById("searchInput").oninput = renderOptions;
+    document.getElementById("refreshBtn").onclick = refreshStatus;
     document.getElementById("loadConfigBtn").onclick = () => configAction("load_config", document.getElementById("configSelect").value);
     document.getElementById("saveConfigBtn").onclick = () => configAction("save_config", document.getElementById("configSelect").value);
     document.getElementById("saveAsConfigBtn").onclick = () => configAction("save_config", document.getElementById("newConfigName").value.trim());
 
-    (async function bootstrap() {
-      if (webToken) {
+    (async function boot() {
+      if (!webToken) return;
+      try {
+        await loadSchema();
         showPanel(true);
-        try {
-          await refreshStatus(true);
-          startPolling();
-        } catch (_) {
-          showPanel(false);
-        }
+        renderSidebar();
+        renderSection();
+        await refreshStatus();
+        pollTimer = setInterval(refreshStatus, 1500);
+      } catch (_) {
+        showPanel(false);
       }
     })();
   </script>
