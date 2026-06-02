@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const path = require("path");
+const panelSchema = require("./panel-schema");
 
 const PANEL_CLIENT_TTL_MS = 45 * 1000;
 const PANEL_WEB_TTL_MS = 4 * 60 * 60 * 1000;
@@ -127,6 +128,10 @@ function mountPanelApi(app, deps) {
   } = deps;
 
   setInterval(cleanupPanelSessions, 60 * 1000).unref();
+
+  app.get("/api/panel/schema", (_req, res) => {
+    res.json({ ok: true, schema: panelSchema });
+  });
 
   app.post("/api/panel/client/register", (req, res) => {
     const { key, hwid } = req.body || {};
