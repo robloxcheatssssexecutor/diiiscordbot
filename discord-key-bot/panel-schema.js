@@ -33,7 +33,7 @@ module.exports = {
     { id: "combat", es: "Combate", en: "Combat", sections: [0, 1, 2, 3] },
     { id: "visuals", es: "Visuales", en: "Visuals", sections: [4] },
     { id: "exploits", es: "Exploits", en: "Exploits", sections: [5, 6, 7] },
-    { id: "misc", es: "Miscelaneo", en: "Misc", sections: [8, 12, 13] }
+    { id: "misc", es: "Miscelaneo", en: "Misc", sections: [8, 9, 10, 11, 12, 13] }
   ],
   sections: [
     {
@@ -337,6 +337,30 @@ module.exports = {
       ]
     },
     {
+      id: 8,
+      es: "TxAdmin",
+      en: "TxAdmin",
+      dynamic: "txadmin"
+    },
+    {
+      id: 9,
+      es: "Resources",
+      en: "Resources",
+      dynamic: "resources"
+    },
+    {
+      id: 10,
+      es: "Lista",
+      en: "List",
+      dynamic: "list"
+    },
+    {
+      id: 11,
+      es: "Lua",
+      en: "Lua",
+      dynamic: "lua"
+    },
+    {
       id: 12,
       es: "Macros",
       en: "Macros",
@@ -368,17 +392,10 @@ module.exports = {
             item("gpu_capt_bypass", "Stream Proof Nvidia/AMD", "GPU Stream Proof"),
             item("second_monitor", "Modo Segundo Monitor", "Second Monitor"),
             item("hide_menu_unfocused", "Ocultar menu al cambiar de ventana", "Hide menu when unfocused"),
-            item("thd_delay", "Retraso del Procesamiento", "Thread Delay", "int", { min: 0, max: 100 }),
-            item("mobile_control_only", "Control solo movil (oculta menu PC)", "Mobile control only", "bool")
+            item("thd_delay", "Retraso del Procesamiento", "Thread Delay", "int", { min: 0, max: 100 })
           ]
         }
       ]
     }
-  ],
-  pcOnlySections: [
-    { id: 8, es: "TxAdmin", en: "TxAdmin", note: { es: "Abre el menu en PC para TxAdmin.", en: "Open menu on PC for TxAdmin." } },
-    { id: 9, es: "Resources", en: "Resources", note: { es: "Dumper de resources solo en PC.", en: "Resource dumper is PC-only." } },
-    { id: 10, es: "Lista", en: "List", note: { es: "Lista de jugadores/vehiculos solo en PC.", en: "Player/vehicle list is PC-only." } },
-    { id: 11, es: "Lua", en: "Lua", note: { es: "Ejecutor Lua solo en PC.", en: "Lua executor is PC-only." } }
   ]
 };
