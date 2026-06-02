@@ -24,9 +24,19 @@
     .card { background:var(--card); border:1px solid var(--stroke); border-radius:14px; padding:14px; margin-bottom:12px; }
     label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; }
     input, select, button { font:inherit; }
-    input[type=text], input[type=password], input[type=number], select {
+    input[type=text], input[type=password], input[type=number], input[type=range], select, textarea {
       width:100%; padding:11px 12px; border-radius:12px; border:1px solid var(--stroke); background:#0d1017; color:var(--text);
+      font-size:16px;
     }
+    textarea { min-height:140px; resize:vertical; font-family:Consolas,monospace; }
+    .num-wrap { display:flex; flex-direction:column; gap:6px; min-width:130px; align-items:stretch; }
+    .num-wrap input[type=range] { padding:0; height:28px; }
+    .num-wrap input[type=text] { width:100%; padding:8px 10px; text-align:center; }
+    .list-row { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+    .list-row:last-child { border-bottom:0; }
+    .list-meta { font-size:.75rem; color:var(--muted); }
+    .row-btns { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .row-btns button { padding:7px 10px; font-size:.75rem; }
     button { border:0; border-radius:12px; padding:11px 14px; font-weight:600; background:var(--accent); color:#111; cursor:pointer; }
     button.secondary { background:#252b39; color:var(--text); }
     button.ghost { background:transparent; border:1px solid var(--stroke); color:var(--muted); }
@@ -50,7 +60,7 @@
     .slider:before { content:""; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
     .switch input:checked + .slider { background:var(--accent); }
     .switch input:checked + .slider:before { transform:translateX(20px); }
-    .num { width:88px; padding:7px 8px; font-size:.85rem; border-radius:10px; border:1px solid var(--stroke); background:#0d1017; color:var(--text); }
+    .num { width:100%; padding:8px 10px; font-size:16px; border-radius:10px; border:1px solid var(--stroke); background:#0d1017; color:var(--text); }
     .bottom { position:fixed; left:0; right:0; bottom:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(10,12,16,.96); border-top:1px solid var(--stroke); display:flex; gap:8px; justify-content:center; }
     .note { color:var(--muted); font-size:.82rem; line-height:1.4; }
     .cloud-badge { display:inline-block; font-size:.68rem; background:var(--accent-dim); color:var(--accent); padding:3px 8px; border-radius:999px; margin-top:6px; }
@@ -79,7 +89,7 @@
         <input id="licenseKey" type="text" placeholder="FALCAO-EXTERNAL-XXXXXX-XXXXXXX" autocomplete="off" />
         <button id="loginBtn" class="full" type="button" style="margin-top:12px">Conectar panel</button>
         <p id="loginMsg" class="msg"></p>
-        <p class="note" style="margin-top:10px">1) Abre FiveM + external en tu PC y haz login.<br>2) Entra aqui con la misma key.<br>3) En PC no veras el menu — solo visuals/FOV activados.</p>
+        <p class="note" style="margin-top:10px">El panel es una <strong>web en la nube</strong> (no guardes ni abras archivos HTML locales).<br>1) Ejecuta el external en tu PC y haz login.<br>2) Abre esta misma URL en el movil con tu key.<br>3) El juego recibe clicks normalmente — el menu no bloquea.</p>
       </div>
     </section>
 
@@ -114,8 +124,14 @@
     let webToken = localStorage.getItem(STORAGE_KEY) || "";
     let schema = null;
     let stateMap = new Map();
+    let liveMeta = {};
     let activeSection = 0;
     let pollTimer = null;
+    let selectedPlayerNetId = null;
+
+    const TX_ROWS_ES = ["Modo jugador", "Teleport", "Spawn vehiculo", "Curar", "Anuncio", "Reset world", "Player IDs"];
+    const TX_ROWS = ["Player Mode", "Teleport", "Vehicle Spawn", "Heal", "Announcement", "Reset World", "Player IDs"];
+    const TX_MODES = ["NoClip", "Godmode", "Beast Jump"];
 
     async function api(path, options = {}) {
       const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
@@ -176,29 +192,191 @@
           nav.appendChild(btn);
         }
       }
-      for (const sec of schema.pcOnlySections || []) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "nav-btn" + (activeSection === sec.id ? " active" : "");
-        btn.textContent = t(sec) + " *";
-        btn.onclick = () => { activeSection = sec.id; renderSidebar(); renderSection(); };
-        nav.appendChild(btn);
+    }
+
+    async function sendCommand(command) {
+      await api("/api/panel/web/command", { method:"POST", body: JSON.stringify(command) });
+    }
+
+    function renderDynamicSection(sec) {
+      const main = document.getElementById("mainPanel");
+      main.innerHTML = "";
+      const h = document.createElement("h2");
+      h.className = "section-title";
+      h.textContent = t(sec);
+      main.appendChild(h);
+
+      if (sec.dynamic === "resources") {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<div class="note">${liveMeta.resourceStatus || "Escaneando resources..."}</div>`;
+        main.appendChild(card);
+        const listCard = document.createElement("div");
+        listCard.className = "card";
+        for (const r of liveMeta.resources || []) {
+          const row = document.createElement("div");
+          row.className = "list-row";
+          row.innerHTML = `<div><div>${r.path}</div><div class="list-meta">${r.state}</div></div>`;
+          const btns = document.createElement("div");
+          btns.className = "row-btns";
+          const stop = document.createElement("button");
+          stop.className = "secondary";
+          stop.type = "button";
+          stop.textContent = "Stop";
+          stop.onclick = async () => {
+            try { await sendCommand({ type:"stop_resource", pointer: r.pointer }); } catch(e){ alert(e.message); }
+          };
+          btns.appendChild(stop);
+          row.appendChild(btns);
+          listCard.appendChild(row);
+        }
+        main.appendChild(listCard);
+        return;
+      }
+
+      if (sec.dynamic === "list") {
+        const pCard = document.createElement("div");
+        pCard.className = "card";
+        pCard.innerHTML = `<div class="group-title">Jugadores cercanos</div>`;
+        for (const p of liveMeta.players || []) {
+          const row = document.createElement("div");
+          row.className = "list-row";
+          const selected = selectedPlayerNetId === p.netId;
+          row.innerHTML = `<div><div>${p.name}${p.isFriend ? " [FRIEND]" : ""}${selected ? " ✓" : ""}</div><div class="list-meta">NetID: ${p.netId} · ${p.distance}m</div></div>`;
+          const btns = document.createElement("div");
+          btns.className = "row-btns";
+          const sel = document.createElement("button");
+          sel.className = "ghost";
+          sel.type = "button";
+          sel.textContent = "Sel.";
+          sel.onclick = () => { selectedPlayerNetId = p.netId; renderSection(); };
+          btns.appendChild(sel);
+          if (p.netId >= 0) {
+            [["Tasear", { type:"player_taze", netId:p.netId }], ["Amigo", { type:"player_friend_add", netId:p.netId }], ["Quitar amigo", { type:"player_friend_remove", netId:p.netId }], ["Outfit", { type:"player_copy_outfit", netId:p.netId }]].forEach(([label, cmd]) => {
+              const b = document.createElement("button");
+              b.className = "secondary";
+              b.type = "button";
+              b.textContent = label;
+              b.onclick = async () => { try { await sendCommand(cmd); } catch(e){ alert(e.message); } };
+              btns.appendChild(b);
+            });
+          }
+          row.appendChild(btns);
+          pCard.appendChild(row);
+        }
+        main.appendChild(pCard);
+
+        const vCard = document.createElement("div");
+        vCard.className = "card";
+        vCard.innerHTML = `<div class="group-title">Vehiculos cercanos</div>`;
+        for (const v of liveMeta.vehicles || []) {
+          const row = document.createElement("div");
+          row.className = "list-row";
+          row.innerHTML = `<div><div>${v.name}</div><div class="list-meta">${v.distance}m · idx ${v.index}</div></div>`;
+          vCard.appendChild(row);
+        }
+        main.appendChild(vCard);
+        return;
+      }
+
+      if (sec.dynamic === "lua") {
+        const card = document.createElement("div");
+        card.className = "card";
+        const status = liveMeta.lua || {};
+        card.innerHTML = `<div class="note">Hook: ${status.hookReady ? "listo" : "no listo"} · ${status.lastDetail || ""}</div>`;
+        const ta = document.createElement("textarea");
+        ta.id = "luaScript";
+        ta.placeholder = "Pega tu script .lua aqui...";
+        card.appendChild(ta);
+        const run = document.createElement("button");
+        run.className = "full";
+        run.type = "button";
+        run.style.marginTop = "10px";
+        run.textContent = "Ejecutar Lua";
+        run.onclick = async () => {
+          const script = ta.value.trim();
+          if (!script) return alert("Pega un script primero.");
+          try { await sendCommand({ type:"execute_lua", script }); alert("Script enviado al external."); } catch(e){ alert(e.message); }
+        };
+        card.appendChild(run);
+        main.appendChild(card);
+        return;
+      }
+
+      if (sec.dynamic === "txadmin") {
+        const tx = liveMeta.txadmin || {};
+        const card = document.createElement("div");
+        card.className = "card";
+        const rows = LANG === "es" ? TX_ROWS_ES : TX_ROWS;
+        card.innerHTML = `<div class="note">Menu TxAdmin: ${tx.menuOpen ? "ABIERTO" : "cerrado"} · Fila: ${rows[tx.selectedRow] || tx.selectedRow}</div>`;
+        const btns = document.createElement("div");
+        btns.className = "row-btns";
+        btns.style.marginTop = "10px";
+        [
+          ["Abrir/Cerrar menu", { type:"txadmin_toggle" }],
+          ["Subir", { type:"txadmin_row", delta:-1 }],
+          ["Bajar", { type:"txadmin_row", delta:1 }],
+          ["Activar fila", { type:"txadmin_activate" }]
+        ].forEach(([label, cmd]) => {
+          const b = document.createElement("button");
+          b.className = "secondary";
+          b.type = "button";
+          b.textContent = label;
+          b.onclick = async () => { try { await sendCommand(cmd); setTimeout(refreshStatus, 400); } catch(e){ alert(e.message); } };
+          btns.appendChild(b);
+        });
+        card.appendChild(btns);
+
+        const modeWrap = document.createElement("div");
+        modeWrap.style.marginTop = "12px";
+        modeWrap.innerHTML = `<label>Modo jugador (Player Mode)</label>`;
+        const modeSel = document.createElement("select");
+        TX_MODES.forEach((m, i) => {
+          const o = document.createElement("option");
+          o.value = i; o.textContent = m;
+          modeSel.appendChild(o);
+        });
+        modeSel.value = String(tx.playerMode || 0);
+        modeSel.onchange = async () => {
+          try {
+            await sendCommand({ type:"txadmin_player_mode", mode: parseInt(modeSel.value, 10) });
+          } catch(e){ alert(e.message); }
+        };
+        modeWrap.appendChild(modeSel);
+        card.appendChild(modeWrap);
+
+        const idsRow = document.createElement("div");
+        idsRow.className = "option";
+        idsRow.style.marginTop = "12px";
+        const idsLabel = document.createElement("label");
+        idsLabel.textContent = "Mostrar Player IDs";
+        idsRow.appendChild(idsLabel);
+        const wrap = document.createElement("label");
+        wrap.className = "switch";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = !!tx.showPlayerIds;
+        input.onchange = async () => {
+          try { await sendCommand({ type:"txadmin_show_ids", value: input.checked }); } catch(e){ alert(e.message); }
+        };
+        const span = document.createElement("span");
+        span.className = "slider";
+        wrap.appendChild(input); wrap.appendChild(span);
+        idsRow.appendChild(wrap);
+        card.appendChild(idsRow);
+        main.appendChild(card);
       }
     }
 
     function renderSection() {
       const main = document.getElementById("mainPanel");
       main.innerHTML = "";
-      const pc = (schema.pcOnlySections || []).find(s => s.id === activeSection);
-      if (pc) {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `<div class="section-title">${t(pc)}</div><p class="note">${t(pc.note)}</p>`;
-        main.appendChild(card);
-        return;
-      }
       const sec = schema.sections.find(s => s.id === activeSection);
       if (!sec) return;
+      if (sec.dynamic) {
+        renderDynamicSection(sec);
+        return;
+      }
       const h = document.createElement("h2");
       h.className = "section-title";
       h.textContent = t(sec);
@@ -228,8 +406,7 @@
       btn.type = "button";
       btn.textContent = "Ejecutar";
       btn.onclick = async () => {
-        try { await api("/api/panel/web/command", { method:"POST", body: JSON.stringify(entry.command) }); }
-        catch (e) { alert(e.message); }
+        try { await sendCommand(entry.command); } catch (e) { alert(e.message); }
       };
       row.appendChild(label);
       row.appendChild(btn);
@@ -269,18 +446,32 @@
         sel.onchange = () => setOption(entry.key, parseInt(sel.value, 10));
         row.appendChild(sel);
       } else {
-        const input = document.createElement("input");
-        input.className = "num";
-        input.type = "number";
-        input.step = entry.step || (entry.kind === "float" ? "0.01" : "1");
-        if (entry.min != null) input.min = entry.min;
-        if (entry.max != null) input.max = entry.max;
-        input.value = val;
-        input.onchange = () => {
-          const v = entry.kind === "float" ? parseFloat(input.value) : parseInt(input.value, 10);
-          if (!Number.isNaN(v)) setOption(entry.key, v);
+        const wrap = document.createElement("div");
+        wrap.className = "num-wrap";
+        const min = entry.min != null ? entry.min : 0;
+        const max = entry.max != null ? entry.max : (entry.kind === "float" ? 100 : 1000);
+        const step = entry.step || (entry.kind === "float" ? 0.01 : 1);
+        const range = document.createElement("input");
+        range.type = "range";
+        range.min = min; range.max = max; range.step = step; range.value = val;
+        const text = document.createElement("input");
+        text.type = "text";
+        text.inputMode = entry.kind === "float" ? "decimal" : "numeric";
+        text.value = val;
+        const apply = (raw) => {
+          const v = entry.kind === "float" ? parseFloat(raw) : parseInt(raw, 10);
+          if (Number.isNaN(v)) return;
+          const clamped = Math.min(max, Math.max(min, v));
+          text.value = clamped;
+          range.value = clamped;
+          setOption(entry.key, entry.kind === "float" ? clamped : Math.round(clamped));
         };
-        row.appendChild(input);
+        range.oninput = () => apply(range.value);
+        text.onchange = () => apply(text.value);
+        text.onblur = () => apply(text.value);
+        wrap.appendChild(range);
+        wrap.appendChild(text);
+        row.appendChild(wrap);
       }
       return row;
     }
@@ -290,13 +481,13 @@
       local.value = value;
       stateMap.set(name, local);
       try {
-        await api("/api/panel/web/command", { method:"POST", body: JSON.stringify({ type:"option", name, value }) });
+        await sendCommand({ type:"option", name, value });
       } catch (e) { alert(e.message); }
     }
 
     async function configAction(action, configName) {
       if (!configName) return alert("Nombre de config requerido");
-      await api("/api/panel/web/command", { method:"POST", body: JSON.stringify({ type: action, configName }) });
+      await sendCommand({ type: action, configName });
       setTimeout(refreshStatus, 900);
     }
 
@@ -307,6 +498,7 @@
       document.getElementById("onlineDot").classList.toggle("on", online);
       document.getElementById("onlineLabel").textContent = online ? "Online" : "Offline";
       rebuildStateMap((data.state && data.state.items) || []);
+      liveMeta = (data.state && data.state.meta) || {};
       const configs = (data.state && data.state.meta && data.state.meta.configs) || [];
       const sel = document.getElementById("configSelect");
       const cur = sel.value;
