@@ -27,13 +27,15 @@ const weaponPresets = {
   en: ["WEAPON_PISTOL", "WEAPON_COMBATPISTOL", "WEAPON_SMG", "WEAPON_ASSAULTRIFLE", "WEAPON_CARBINERIFLE", "WEAPON_PUMPSHOTGUN", "WEAPON_SNIPERRIFLE", "WEAPON_STUNGUN", "WEAPON_KNIFE", "WEAPON_GRENADE"]
 };
 
+const { extraSections, extraCategoryPatches } = require("./panel-schema-extra");
+
 module.exports = {
-  version: 2,
+  version: 3,
   categories: [
     { id: "combat", es: "Combate", en: "Combat", sections: [0, 1, 2, 3] },
-    { id: "visuals", es: "Visuales", en: "Visuals", sections: [4] },
+    { id: "visuals", es: "Visuales", en: "Visuals", sections: [4, ...extraCategoryPatches.visuals] },
     { id: "exploits", es: "Exploits", en: "Exploits", sections: [5, 6, 7] },
-    { id: "misc", es: "Miscelaneo", en: "Misc", sections: [8, 9, 10, 11, 12, 13] }
+    { id: "misc", es: "Miscelaneo", en: "Misc", sections: [8, 9, 10, 11, 12, 13, ...extraCategoryPatches.misc] }
   ],
   sections: [
     {
@@ -164,6 +166,7 @@ module.exports = {
           en: "Players",
           items: [
             item("esp_players_enabled", "Activar ESP General", "Enable Main ESP"),
+            item("esp_players_key", "Tecla toggle ESP (VK)", "ESP toggle key (VK)", "int", { min: 0, max: 255 }),
             item("esp_players_localplayer", "Mostrar Local", "Show Local"),
             item("esp_players_npscs", "Mostrar NPCs", "Show NPCs"),
             item("esp_players_showdead", "Mostrar Muertos", "Show Dead Bodies"),
@@ -217,7 +220,13 @@ module.exports = {
             item("esp_players_box_thick", "Grosor de la Caja", "Box Thickness", "float", { min: 0.5, max: 5, step: 0.1 }),
             item("esp_players_outline_thick", "Grosor del Borde", "Outline Thickness", "float", { min: 0.5, max: 5, step: 0.1 }),
             item("esp_players_corner_len", "Longitud de Esquinas", "Corner Length", "float", { min: 1, max: 40, step: 1 }),
-            item("esp_players_glowalpha", "Opacidad del Brillo", "Glow Alpha", "float", { min: 0, max: 1, step: 0.01 })
+            item("esp_players_glowalpha", "Opacidad del Brillo", "Glow Alpha", "float", { min: 0, max: 1, step: 0.01 }),
+            item("esp_players_box_round", "Redondeo caja", "Box rounding", "float", { min: 0, max: 12, step: 0.5 }),
+            item("esp_players_corner_thick", "Grosor esquinas", "Corner thickness", "float", { min: 0.5, max: 5, step: 0.1 }),
+            item("esp_players_snapline_thick", "Grosor snapline", "Snapline thickness", "float", { min: 0.5, max: 5, step: 0.1 }),
+            item("esp_players_headcircle_thick", "Grosor circulo cabeza", "Head circle thickness", "float", { min: 0.5, max: 5, step: 0.1 }),
+            item("esp_players_pos_offx", "Offset X ESP", "ESP offset X", "float", { min: -50, max: 50, step: 1 }),
+            item("esp_players_pos_offy", "Offset Y ESP", "ESP offset Y", "float", { min: -50, max: 50, step: 1 })
           ]
         },
         {
@@ -325,6 +334,10 @@ module.exports = {
             item("veh_primary_r", "Color primario R", "Primary R", "int", { min: 0, max: 255 }),
             item("veh_primary_g", "Color primario G", "Primary G", "int", { min: 0, max: 255 }),
             item("veh_primary_b", "Color primario B", "Primary B", "int", { min: 0, max: 255 }),
+            item("veh_secondary_enabled", "Color secundario", "Secondary color enabled"),
+            item("veh_secondary_r", "Secundario R", "Secondary R", "int", { min: 0, max: 255 }),
+            item("veh_secondary_g", "Secundario G", "Secondary G", "int", { min: 0, max: 255 }),
+            item("veh_secondary_b", "Secundario B", "Secondary B", "int", { min: 0, max: 255 }),
             item("veh_carry", "Lanzar Coche", "Carry Vehicle"),
             action("repair_vehicle", "Reparar Vehiculo", "Repair Vehicle", { type: "pulse", name: "veh_repair_once" }),
             action("unlock_vehicle", "Desbloquear Auto Cercano", "Unlock Nearest Vehicle", { type: "pulse", name: "exp_unlock_key" }),
@@ -384,6 +397,31 @@ module.exports = {
       en: "Settings",
       groups: [
         {
+          es: "Acciones",
+          en: "Actions",
+          items: [
+            action("panel_unload", "Unload Cheat", "Unload Cheat", { type: "unload" }),
+            action("panel_bypass", "Bypass", "Bypass", { type: "bypass" })
+          ]
+        },
+        {
+          es: "Menu / HUD",
+          en: "Menu / HUD",
+          items: [
+            item("menu_background_snow", "Fondo constelacion", "Constellation background"),
+            item("hud_brand_watermark", "Marca de agua (logo + tiempo)", "Brand watermark (logo + time)"),
+            item("hud_crosshair", "Mira (crosshair)", "Crosshair"),
+            item("ui_visual_quality", "Calidad visual", "Visual quality", "int", {
+              min: 0,
+              max: 2,
+              options: {
+                es: ["Rendimiento", "Equilibrado", "Nitido"],
+                en: ["Performance", "Balanced", "Crisp"]
+              }
+            })
+          ]
+        },
+        {
           es: "Security",
           en: "Security",
           items: [
@@ -392,10 +430,12 @@ module.exports = {
             item("gpu_capt_bypass", "Stream Proof Nvidia/AMD", "GPU Stream Proof"),
             item("second_monitor", "Modo Segundo Monitor", "Second Monitor"),
             item("hide_menu_unfocused", "Ocultar menu al cambiar de ventana", "Hide menu when unfocused"),
-            item("thd_delay", "Retraso del Procesamiento", "Thread Delay", "int", { min: 0, max: 100 })
+            item("thd_delay", "Retraso del Procesamiento", "Thread Delay", "int", { min: 0, max: 100 }),
+            item("login_orange_particles", "Particulas login", "Login particles")
           ]
         }
       ]
-    }
+    },
+    ...extraSections
   ]
 };
