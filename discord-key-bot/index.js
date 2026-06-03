@@ -25,6 +25,8 @@ const LOG_CHANNEL_KEYGEN_ID = "1502007948497391708";
 const LOG_CHANNEL_RESETHWID_ID = "1502007476076282056";
 const LOG_CHANNEL_TRANSCRIPTS_ID = "1502007473157177507";
 const LOG_CHANNEL_ERRORS_ID = "1502039396978003979";
+const KEYS_BACKUP_CHANNEL_ID = process.env.KEYS_BACKUP_CHANNEL_ID || "1511740812621250712";
+const KEYS_BACKUP_SCHEMA = "falcao-external-keys-backup-v1";
 const OFFER_CHANNEL_ID = "1502029921629900890";
 const SUGGESTION_CHANNEL_IDS = new Set(["1502035178309161150", "1502007614047785182"]);
 const TICKET_CATEGORY_BUY = "Buy Tickets";
@@ -129,7 +131,6 @@ function restoreKeysFromLatestBackup() {
 }
 const BRAND_ORANGE = 0xff8a33;
 const BUTTON_COOLDOWN_MS = 2500;
-const BACKUP_INTERVAL_HOURS = Number(process.env.BACKUP_INTERVAL_HOURS || 6);
 const PANEL_LOGO_URL = "https://i.imgur.com/Nuy61wA.png";
 
 const PAYMENT_METHODS = [
@@ -234,22 +235,6 @@ function hashString(input) {
   return (hash >>> 0).toString(16);
 }
 
-function runDataBackup() {
-  ensureDb();
-  const backupDir = path.join(dataDir, "backups");
-  if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
-  }
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const files = [dbPath, pricesPath, purchasesPath];
-  for (const source of files) {
-    if (!fs.existsSync(source)) continue;
-    const base = path.basename(source, ".json");
-    const target = path.join(backupDir, `${base}-${stamp}.json`);
-    fs.copyFileSync(source, target);
-  }
-}
-
 function readPrices() {
   ensurePrices();
   const parsed = JSON.parse(fs.readFileSync(pricesPath, "utf8"));
@@ -339,36 +324,161 @@ function readDb() {
     }
     return data;
   };
+
+  const restoreCandidates = [
+  () => {
+    const bak = `${dbPath}.bak`;
+    if (!fs.existsSync(bak)) return null;
+    return parseKeysFile(bak);
+  },
+  () => restoreKeysFromLatestBackup()
+  ];
+
   try {
     return parseKeysFile(dbPath);
   } catch (e) {
     console.error(`[data] Cannot read ${dbPath}:`, e.message);
-    try {
-      const bak = `${dbPath}.bak`;
-      if (fs.existsSync(bak)) {
-        const restored = parseKeysFile(bak);
-        console.warn("[data] Restored keys from keys.json.bak");
-        atomicWriteJsonFile(dbPath, restored);
-        return restored;
+    for (const restore of restoreCandidates) {
+      try {
+        const restored = restore();
+        if (restored && restored.keys.length > 0) {
+          console.warn(`[data] Restored ${restored.keys.length} keys from backup source`);
+          atomicWriteJsonFile(dbPath, restored);
+          return restored;
+        }
+      } catch (restoreError) {
+        console.error("[data] Backup restore attempt failed:", restoreError.message);
       }
-    } catch (e2) {
-      console.error("[data] keys.json.bak unusable:", e2.message);
     }
-    const fromScheduledBackup = restoreKeysFromLatestBackup();
-    if (fromScheduledBackup) {
-      console.warn("[data] Restored keys from data/backups snapshot");
-      atomicWriteJsonFile(dbPath, fromScheduledBackup);
-      return fromScheduledBackup;
-    }
-    console.error("[data] No backup found; initializing empty keys database");
+    console.error("[data] No local backup found; waiting for Discord restore on bot ready");
     const empty = { keys: [] };
     atomicWriteJsonFile(dbPath, empty);
     return empty;
   }
 }
 
+function logDatabaseStatus() {
+  try {
+    const db = readDb();
+    console.log(`[data] Using database: ${dbPath}`);
+    console.log(`[data] Keys loaded: ${db.keys.length}`);
+    if (db.keys.length === 0) {
+      console.warn("[data] WARNING: 0 keys loaded. Check Discord backup channel or generate keys.");
+    }
+  } catch (error) {
+    console.error("[data] Startup database check failed:", error.message);
+  }
+}
+
+let discordClientRef = null;
+let keysBackupPushInFlight = false;
+let keysBackupPushQueued = false;
+
+function buildKeysBackupPayload(reason = "change") {
+  const db = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+  return {
+    schema: KEYS_BACKUP_SCHEMA,
+    exportedAt: new Date().toISOString(),
+    reason,
+    keys: Array.isArray(db.keys) ? db.keys : []
+  };
+}
+
+async function fetchLatestDiscordKeysBackup(clientInstance) {
+  if (!clientInstance?.isReady()) return null;
+  const channel = await clientInstance.channels.fetch(KEYS_BACKUP_CHANNEL_ID).catch(() => null);
+  if (!channel || !channel.isTextBased()) return null;
+
+  let lastId;
+  for (let page = 0; page < 30; page += 1) {
+    const opts = { limit: 100 };
+    if (lastId) opts.before = lastId;
+    const fetched = await channel.messages.fetch(opts);
+    if (!fetched.size) break;
+
+    const messages = [...fetched.values()].sort((a, b) => b.createdTimestamp - a.createdTimestamp);
+    for (const msg of messages) {
+      if (msg.author?.id !== clientInstance.user.id) continue;
+      const attachment = msg.attachments.find(
+        (a) => a.name && a.name.startsWith("keys-backup-") && a.name.endsWith(".json")
+      );
+      if (!attachment?.url) continue;
+      const res = await fetch(attachment.url);
+      if (!res.ok) continue;
+      const parsed = JSON.parse(await res.text());
+      if (parsed && Array.isArray(parsed.keys)) {
+        return parsed;
+      }
+    }
+
+    lastId = fetched.last().id;
+    if (fetched.size < 100) break;
+  }
+  return null;
+}
+
+async function restoreKeysFromDiscordChannel(clientInstance) {
+  const backup = await fetchLatestDiscordKeysBackup(clientInstance);
+  if (!backup || !Array.isArray(backup.keys)) {
+    console.warn("[backup-discord] No keys backup found in Discord channel");
+    return false;
+  }
+  atomicWriteJsonFile(dbPath, { keys: backup.keys });
+  console.log(`[backup-discord] Restored ${backup.keys.length} keys from Discord`);
+  return true;
+}
+
+async function pushKeysBackupToDiscord(clientInstance, reason = "change") {
+  if (!clientInstance?.isReady()) {
+    keysBackupPushQueued = true;
+    return;
+  }
+  if (keysBackupPushInFlight) {
+    keysBackupPushQueued = true;
+    return;
+  }
+  keysBackupPushInFlight = true;
+  try {
+    ensureDb();
+    const payload = buildKeysBackupPayload(reason);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const fileName = `keys-backup-${stamp}.json`;
+    const attachment = new AttachmentBuilder(Buffer.from(JSON.stringify(payload, null, 2), "utf8"), {
+      name: fileName
+    });
+    const channel = await clientInstance.channels.fetch(KEYS_BACKUP_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      throw new Error("Backup channel not found or not text-based");
+    }
+    await channel.send({
+      content: `🔐 Keys backup • **${payload.keys.length}** keys • \`${reason}\``,
+      files: [attachment]
+    });
+    console.log(`[backup-discord] Pushed backup (${payload.keys.length} keys, reason: ${reason})`);
+  } catch (error) {
+    console.error("[backup-discord] Push failed:", error.message);
+    logError("backup_discord_push", error, { reason }).catch(() => {});
+  } finally {
+    keysBackupPushInFlight = false;
+    if (keysBackupPushQueued) {
+      keysBackupPushQueued = false;
+      pushKeysBackupToDiscord(clientInstance, reason).catch(() => {});
+    }
+  }
+}
+
 function writeDb(db) {
+  if (fs.existsSync(dbPath)) {
+    try {
+      fs.copyFileSync(dbPath, `${dbPath}.bak`);
+    } catch (_) {
+      /* ignore backup copy errors */
+    }
+  }
   atomicWriteJsonFile(dbPath, db);
+  if (discordClientRef) {
+    pushKeysBackupToDiscord(discordClientRef, "keys-change").catch(() => {});
+  }
 }
 
 function hasRequiredRole(member) {
@@ -799,14 +909,28 @@ mountPanelApi(app, {
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers]
 });
+discordClientRef = client;
 
-client.once("ready", () => {
-  console.log(`Bot online: ${client.user.tag}`);
-  console.log(`[data] Persistent directory: ${dataDir}`);
-  console.log(`[data] Keys file: ${dbPath}`);
-  if (!process.env.PERSISTENT_DATA_DIR && !process.env.DATA_DIR) {
-    console.log("[data] Tip: set PERSISTENT_DATA_DIR to a mounted volume path on your host so keys survive redeploys.");
+let apiServerStarted = false;
+
+client.once("ready", async () => {
+  try {
+    await restoreKeysFromDiscordChannel(client);
+  } catch (error) {
+    console.error("[backup-discord] Restore on startup failed:", error.message);
+    logError("backup_discord_restore", error).catch(() => {});
   }
+  logDatabaseStatus();
+  if (!apiServerStarted) {
+    app.listen(API_PORT, () => {
+      console.log(`HTTP API online on port ${API_PORT}`);
+    });
+    apiServerStarted = true;
+  }
+  console.log(`Bot online: ${client.user.tag}`);
+  console.log(`[data] Data directory: ${dataDir}`);
+  console.log(`[data] Keys file: ${dbPath}`);
+  console.log(`[backup-discord] Backup channel: ${KEYS_BACKUP_CHANNEL_ID}`);
   const slashCommands = [
     new SlashCommandBuilder().setName("falcaohelp").setDescription("Show bot commands."),
     new SlashCommandBuilder().setName("ticketpanel").setDescription("Send ticket panel."),
@@ -918,15 +1042,6 @@ setInterval(async () => {
   }
 }, 60 * 1000);
 
-setInterval(() => {
-  try {
-    runDataBackup();
-  } catch (error) {
-    console.error("Backup job failed:", error.message);
-    logError("backup_interval", error).catch(() => {});
-  }
-}, Math.max(1, BACKUP_INTERVAL_HOURS) * 60 * 60 * 1000);
-
 setInterval(async () => {
   const now = Date.now();
   for (const [messageId, suggestion] of suggestionVotes.entries()) {
@@ -961,10 +1076,6 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(PREFIX)) return;
   await message.reply("Commands are now slash-only. Please use `/` commands.");
-});
-
-app.listen(API_PORT, () => {
-  console.log(`HTTP API online on port ${API_PORT}`);
 });
 
 process.on("unhandledRejection", (reason) => {
