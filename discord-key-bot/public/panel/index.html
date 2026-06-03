@@ -60,10 +60,25 @@
     .slider:before { content:""; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
     .switch input:checked + .slider { background:var(--accent); }
     .switch input:checked + .slider:before { transform:translateX(20px); }
+    .toggle-btns { display:flex; gap:6px; flex-shrink:0; }
+    .toggle-btns button { padding:7px 12px; font-size:.75rem; min-width:72px; }
+    .toggle-btns button.on { background:var(--accent); color:#111; }
+    .toggle-btns button.off { background:#252b39; color:var(--text); }
     .num { width:100%; padding:8px 10px; font-size:16px; border-radius:10px; border:1px solid var(--stroke); background:#0d1017; color:var(--text); }
     .bottom { position:fixed; left:0; right:0; bottom:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(10,12,16,.96); border-top:1px solid var(--stroke); display:flex; gap:8px; justify-content:center; }
     .note { color:var(--muted); font-size:.82rem; line-height:1.4; }
     .cloud-badge { display:inline-block; font-size:.68rem; background:var(--accent-dim); color:var(--accent); padding:3px 8px; border-radius:999px; margin-top:6px; }
+    .rgba-wrap { display:flex; flex-direction:column; gap:8px; flex:1; min-width:160px; align-items:stretch; }
+    .rgba-row { display:flex; gap:8px; align-items:center; }
+    .rgba-row input[type=color] { width:52px; height:40px; padding:2px; border:1px solid var(--stroke); border-radius:10px; background:#0d1017; cursor:pointer; }
+    .rgba-row input[type=range] { flex:1; }
+    .rgba-alpha { font-size:.75rem; color:var(--muted); text-align:center; }
+    .bind-btn { min-width:110px; padding:8px 12px; font-size:.78rem; }
+    .bind-btn.waiting { background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent); }
+    .visual-mirror-overlay { position:fixed; inset:0; z-index:200; background:#000; display:flex; align-items:center; justify-content:center; }
+    .visual-mirror-overlay img { max-width:100%; max-height:100%; object-fit:contain; }
+    .visual-mirror-exit { position:fixed; top:calc(12px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:210; padding:12px 20px; font-size:.9rem; box-shadow:0 4px 24px rgba(0,0,0,.6); }
+    .visual-mirror-hint { position:fixed; bottom:calc(72px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:210; color:var(--muted); font-size:.78rem; text-align:center; padding:0 16px; }
   </style>
 </head>
 <body>
@@ -95,6 +110,14 @@
 
     <section id="panelView" class="hidden" style="flex:1;display:flex;flex-direction:column;min-height:0">
       <div class="card" style="margin:10px 12px 0">
+        <div class="group-title">Modo visual en movil</div>
+        <p class="note" style="margin:0 0 10px">Pantalla negra en el movil con los visuals del juego (ESP, FOV, etc.) desde tu PC.</p>
+        <div class="option" style="border:0;padding:0">
+          <label>Activar modo visual</label>
+          <div id="visualMirrorToggle"></div>
+        </div>
+      </div>
+      <div class="card" style="margin:10px 12px 0">
         <div class="group-title">Configs</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="configSelect" style="flex:1;min-width:120px"></select>
@@ -113,6 +136,12 @@
     </section>
   </div>
 
+  <div id="visualMirrorOverlay" class="visual-mirror-overlay hidden">
+    <img id="visualMirrorImg" alt="Visuals PC" />
+    <button type="button" id="visualMirrorExitBtn" class="visual-mirror-exit">Desactivar modo visual</button>
+    <p class="visual-mirror-hint">Pantalla negra — solo se muestran los visuals del external</p>
+  </div>
+
   <div class="bottom hidden" id="bottomBar">
     <button class="secondary" id="refreshBtn" type="button">Actualizar</button>
     <button class="ghost" id="logoutBtn" type="button">Salir</button>
@@ -128,6 +157,41 @@
     let activeSection = 0;
     let pollTimer = null;
     let selectedPlayerNetId = null;
+    let visualMirrorOn = false;
+    let pendingBindKey = null;
+
+    const VK_LABELS = {
+      0:"None",1:"Mouse 1",2:"Mouse 2",4:"Mouse 3",5:"Mouse 4",6:"Mouse 5",
+      8:"Back",9:"Tab",13:"Enter",16:"Shift",17:"Ctrl",18:"Menu",27:"Escape",32:"Space",
+      37:"Left",38:"Up",39:"Right",40:"Down",45:"Insert",46:"Delete",
+      112:"F1",113:"F2",114:"F3",115:"F4",116:"F5",117:"F6",118:"F7",119:"F8",120:"F9",121:"F10",122:"F11",123:"F12"
+    };
+
+    function vkLabel(vk) {
+      const n = parseInt(vk, 10) || 0;
+      if (VK_LABELS[n]) return VK_LABELS[n];
+      if (n >= 65 && n <= 90) return String.fromCharCode(n);
+      if (n >= 48 && n <= 57) return String.fromCharCode(n);
+      return "VK " + n;
+    }
+
+    function channelKey(prefix, idx) { return prefix + idx; }
+
+    function float01(key, fallback) {
+      const v = parseFloat(getValue(key, fallback));
+      return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback;
+    }
+
+    function floatToHex(r, g, b) {
+      const h = (x) => Math.round(x * 255).toString(16).padStart(2, "0");
+      return "#" + h(r) + h(g) + h(b);
+    }
+
+    function hexToFloats(hex) {
+      const h = hex.replace("#", "");
+      if (h.length < 6) return [1, 1, 1];
+      return [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255];
+    }
 
     const TX_ROWS_ES = ["Modo jugador", "Teleport", "Spawn vehiculo", "Curar", "Anuncio", "Reset world", "Player IDs"];
     const TX_ROWS = ["Player Mode", "Teleport", "Vehicle Spawn", "Heal", "Announcement", "Reset World", "Player IDs"];
@@ -351,18 +415,26 @@
         const idsLabel = document.createElement("label");
         idsLabel.textContent = "Mostrar Player IDs";
         idsRow.appendChild(idsLabel);
-        const wrap = document.createElement("label");
-        wrap.className = "switch";
-        const input = document.createElement("input");
-        input.type = "checkbox";
-        input.checked = !!tx.showPlayerIds;
-        input.onchange = async () => {
-          try { await sendCommand({ type:"txadmin_show_ids", value: input.checked }); } catch(e){ alert(e.message); }
+        const idsBtns = document.createElement("div");
+        idsBtns.className = "toggle-btns";
+        const idsOn = document.createElement("button");
+        idsOn.type = "button";
+        idsOn.textContent = "Activado";
+        const idsOff = document.createElement("button");
+        idsOff.type = "button";
+        idsOff.textContent = "Desactivado";
+        const idsActive = !!tx.showPlayerIds;
+        idsOn.className = idsActive ? "on" : "off";
+        idsOff.className = idsActive ? "off" : "on";
+        idsOn.onclick = async () => {
+          try { await sendCommand({ type:"txadmin_show_ids", value: true }); setTimeout(refreshStatus, 400); } catch(e){ alert(e.message); }
         };
-        const span = document.createElement("span");
-        span.className = "slider";
-        wrap.appendChild(input); wrap.appendChild(span);
-        idsRow.appendChild(wrap);
+        idsOff.onclick = async () => {
+          try { await sendCommand({ type:"txadmin_show_ids", value: false }); setTimeout(refreshStatus, 400); } catch(e){ alert(e.message); }
+        };
+        idsBtns.appendChild(idsOn);
+        idsBtns.appendChild(idsOff);
+        idsRow.appendChild(idsBtns);
         card.appendChild(idsRow);
         main.appendChild(card);
       }
@@ -390,10 +462,38 @@
         card.appendChild(gt);
         for (const entry of group.items || []) {
           if (entry.kind === "action") card.appendChild(renderAction(entry));
+          else if (entry.kind === "rgba") card.appendChild(renderRgba(entry));
+          else if (entry.kind === "bind") card.appendChild(renderBind(entry));
           else card.appendChild(renderOption(entry));
         }
         main.appendChild(card);
       }
+    }
+
+    function isBinaryToggle(entry) {
+      if (entry.kind === "bool") return true;
+      if (entry.kind === "int" && entry.max != null && entry.min != null && entry.max <= 1 && entry.min >= 0)
+        return true;
+      return false;
+    }
+
+    function renderToggleButtons(entry, currentValue) {
+      const wrap = document.createElement("div");
+      wrap.className = "toggle-btns";
+      const on = document.createElement("button");
+      on.type = "button";
+      on.textContent = "Activado";
+      const off = document.createElement("button");
+      off.type = "button";
+      off.textContent = "Desactivado";
+      const active = !!currentValue;
+      on.className = active ? "on" : "off";
+      off.className = active ? "off" : "on";
+      on.onclick = () => setOption(entry.key, entry.kind === "bool" ? true : 1);
+      off.onclick = () => setOption(entry.key, entry.kind === "bool" ? false : 0);
+      wrap.appendChild(on);
+      wrap.appendChild(off);
+      return wrap;
     }
 
     function renderAction(entry) {
@@ -404,11 +504,77 @@
       const btn = document.createElement("button");
       btn.className = "secondary";
       btn.type = "button";
-      btn.textContent = "Ejecutar";
+      btn.textContent = entry.command && entry.command.type === "unload" ? "Unload" : (entry.command && entry.command.type === "bypass" ? "Bypass" : "Ejecutar");
       btn.onclick = async () => {
         try { await sendCommand(entry.command); } catch (e) { alert(e.message); }
       };
       row.appendChild(label);
+      row.appendChild(btn);
+      return row;
+    }
+
+    function renderRgba(entry) {
+      const row = document.createElement("div");
+      row.className = "option";
+      const label = document.createElement("label");
+      label.textContent = t(entry.label);
+      row.appendChild(label);
+      const prefix = entry.key;
+      const r = float01(channelKey(prefix, 0), 1);
+      const g = float01(channelKey(prefix, 1), 1);
+      const b = float01(channelKey(prefix, 2), 1);
+      const a = float01(channelKey(prefix, 3), 1);
+      const wrap = document.createElement("div");
+      wrap.className = "rgba-wrap";
+      const rgbRow = document.createElement("div");
+      rgbRow.className = "rgba-row";
+      const picker = document.createElement("input");
+      picker.type = "color";
+      picker.value = floatToHex(r, g, b);
+      picker.oninput = () => {
+        const [nr, ng, nb] = hexToFloats(picker.value);
+        setOption(channelKey(prefix, 0), nr);
+        setOption(channelKey(prefix, 1), ng);
+        setOption(channelKey(prefix, 2), nb);
+      };
+      rgbRow.appendChild(picker);
+      const alpha = document.createElement("input");
+      alpha.type = "range";
+      alpha.min = 0; alpha.max = 1; alpha.step = 0.01; alpha.value = a;
+      const alphaLbl = document.createElement("div");
+      alphaLbl.className = "rgba-alpha";
+      alphaLbl.textContent = "Alpha " + Math.round(a * 100) + "%";
+      alpha.oninput = () => {
+        alphaLbl.textContent = "Alpha " + Math.round(parseFloat(alpha.value) * 100) + "%";
+        setOption(channelKey(prefix, 3), parseFloat(alpha.value));
+      };
+      rgbRow.appendChild(alpha);
+      wrap.appendChild(rgbRow);
+      wrap.appendChild(alphaLbl);
+      row.appendChild(wrap);
+      return row;
+    }
+
+    function renderBind(entry) {
+      const row = document.createElement("div");
+      row.className = "option";
+      const label = document.createElement("label");
+      label.textContent = t(entry.label);
+      row.appendChild(label);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "secondary bind-btn";
+      const vk = parseInt(getValue(entry.key, 0), 10) || 0;
+      const waiting = pendingBindKey === entry.key;
+      btn.textContent = waiting ? "Pulsa tecla en PC..." : vkLabel(vk);
+      if (waiting) btn.classList.add("waiting");
+      btn.onclick = async () => {
+        try {
+          pendingBindKey = entry.key;
+          renderSection();
+          await sendCommand({ type: "capture_bind", name: entry.key });
+        } catch (e) { pendingBindKey = null; alert(e.message); renderSection(); }
+      };
       row.appendChild(btn);
       return row;
     }
@@ -420,18 +586,8 @@
       label.textContent = t(entry.label);
       row.appendChild(label);
       const val = getValue(entry.key, entry.kind === "bool" ? false : 0);
-      if (entry.kind === "bool") {
-        const wrap = document.createElement("label");
-        wrap.className = "switch";
-        const input = document.createElement("input");
-        input.type = "checkbox";
-        input.checked = !!val;
-        input.onchange = () => setOption(entry.key, input.checked);
-        const span = document.createElement("span");
-        span.className = "slider";
-        wrap.appendChild(input);
-        wrap.appendChild(span);
-        row.appendChild(wrap);
+      if (isBinaryToggle(entry)) {
+        row.appendChild(renderToggleButtons(entry, val));
       } else if (entry.options) {
         const sel = document.createElement("select");
         sel.className = "num";
@@ -491,6 +647,60 @@
       setTimeout(refreshStatus, 900);
     }
 
+    function renderVisualMirrorToggle() {
+      const host = document.getElementById("visualMirrorToggle");
+      if (!host) return;
+      host.innerHTML = "";
+      host.appendChild(renderToggleButtons(
+        { key: "visual_mirror", kind: "bool" },
+        visualMirrorOn
+      ));
+      const wrap = host.querySelector(".toggle-btns");
+      if (!wrap) return;
+      const [onBtn, offBtn] = wrap.querySelectorAll("button");
+      onBtn.onclick = () => setVisualMirror(true);
+      offBtn.onclick = () => setVisualMirror(false);
+    }
+
+    async function setVisualMirror(on) {
+      visualMirrorOn = !!on;
+      try {
+        await sendCommand({ type: "mobile_visual_mirror", value: visualMirrorOn });
+      } catch (e) { alert(e.message); visualMirrorOn = !on; }
+      updateVisualMirrorOverlay();
+      renderVisualMirrorToggle();
+    }
+
+    function updateVisualMirrorOverlay() {
+      const overlay = document.getElementById("visualMirrorOverlay");
+      const img = document.getElementById("visualMirrorImg");
+      const panel = document.getElementById("panelView");
+      if (!overlay || !img) return;
+      overlay.classList.toggle("hidden", !visualMirrorOn);
+      if (panel) panel.classList.toggle("hidden", visualMirrorOn);
+      document.getElementById("bottomBar").classList.toggle("hidden", !webToken || visualMirrorOn);
+      const vm = liveMeta.visualMirror || {};
+      if (visualMirrorOn && vm.active && vm.frame) {
+        img.src = "data:" + (vm.mime || "image/jpeg") + ";base64," + vm.frame;
+      } else if (visualMirrorOn) {
+        img.removeAttribute("src");
+      }
+    }
+
+    function handleBindCaptureMeta() {
+      const bc = liveMeta.bindCapture || {};
+      if (bc.capturedVk != null && bc.name) {
+        const local = stateMap.get(bc.name) || { name: bc.name, type: "int" };
+        local.value = bc.capturedVk;
+        stateMap.set(bc.name, local);
+        pendingBindKey = null;
+      } else if (!bc.active && pendingBindKey && !bc.capturedVk) {
+        /* still waiting */
+      } else if (!bc.active && pendingBindKey) {
+        pendingBindKey = null;
+      }
+    }
+
     async function refreshStatus() {
       const data = await api("/api/panel/web/status");
       document.getElementById("keyMasked").textContent = data.keyMasked || "—";
@@ -499,6 +709,10 @@
       document.getElementById("onlineLabel").textContent = online ? "Online" : "Offline";
       rebuildStateMap((data.state && data.state.items) || []);
       liveMeta = (data.state && data.state.meta) || {};
+      if (liveMeta.visualMirror) visualMirrorOn = !!liveMeta.visualMirror.active;
+      handleBindCaptureMeta();
+      updateVisualMirrorOverlay();
+      renderVisualMirrorToggle();
       const configs = (data.state && data.state.meta && data.state.meta.configs) || [];
       const sel = document.getElementById("configSelect");
       const cur = sel.value;
@@ -524,6 +738,7 @@
         setLoginMsg("");
         showPanel(true);
         renderSidebar();
+        renderVisualMirrorToggle();
         renderSection();
         await refreshStatus();
         if (pollTimer) clearInterval(pollTimer);
@@ -534,6 +749,11 @@
     }
 
     async function logout() {
+      if (visualMirrorOn) {
+        try { await sendCommand({ type: "mobile_visual_mirror", value: false }); } catch (_) {}
+        visualMirrorOn = false;
+        updateVisualMirrorOverlay();
+      }
       try { await api("/api/panel/web/logout", { method:"POST", body:"{}" }); } catch (_) {}
       webToken = "";
       localStorage.removeItem(STORAGE_KEY);
@@ -547,6 +767,7 @@
     document.getElementById("loadConfigBtn").onclick = () => configAction("load_config", document.getElementById("configSelect").value);
     document.getElementById("saveConfigBtn").onclick = () => configAction("save_config", document.getElementById("configSelect").value);
     document.getElementById("saveAsConfigBtn").onclick = () => configAction("save_config", document.getElementById("newConfigName").value.trim());
+    document.getElementById("visualMirrorExitBtn").onclick = () => setVisualMirror(false);
 
     (async function boot() {
       if (!webToken) return;
@@ -554,6 +775,7 @@
         await loadSchema();
         showPanel(true);
         renderSidebar();
+        renderVisualMirrorToggle();
         renderSection();
         await refreshStatus();
         pollTimer = setInterval(refreshStatus, 1500);
