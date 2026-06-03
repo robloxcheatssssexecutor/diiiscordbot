@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: falcao-discord-bot
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: KEYS_BACKUP_CHANNEL_ID
+        value: "1511740812621250712"
