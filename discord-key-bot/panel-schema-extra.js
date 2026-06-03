@@ -3,12 +3,11 @@ function item(key, es, en, kind = "bool", extra = {}) {
 }
 
 function rgba4(prefix, esName, enName) {
-  return [
-    item(`${prefix}0`, `${esName} R`, `${enName} R`, "float", { min: 0, max: 1, step: 0.01 }),
-    item(`${prefix}1`, `${esName} G`, `${enName} G`, "float", { min: 0, max: 1, step: 0.01 }),
-    item(`${prefix}2`, `${esName} B`, `${enName} B`, "float", { min: 0, max: 1, step: 0.01 }),
-    item(`${prefix}3`, `${esName} A`, `${enName} A`, "float", { min: 0, max: 1, step: 0.01 })
-  ];
+  return [{ key: prefix, label: { es: esName, en: enName }, kind: "rgba" }];
+}
+
+function bindItem(key, es, en) {
+  return item(key, es, en, "bind", { min: 0, max: 255 });
 }
 
 const extraSections = [
@@ -89,39 +88,39 @@ const extraSections = [
         es: "Combate",
         en: "Combat",
         items: [
-          item("abt_key", "Tecla Aimbot (VK)", "Aimbot key (VK)", "int", { min: 0, max: 255 }),
-          item("slt_key", "Tecla Silent (VK)", "Silent key (VK)", "int", { min: 0, max: 255 }),
-          item("magic_key", "Tecla Magic (VK)", "Magic key (VK)", "int", { min: 0, max: 255 }),
-          item("trg_key", "Tecla Trigger (VK)", "Trigger key (VK)", "int", { min: 0, max: 255 })
+          bindItem("abt_key", "Tecla Aimbot", "Aimbot key"),
+          bindItem("slt_key", "Tecla Silent", "Silent key"),
+          bindItem("magic_key", "Tecla Magic", "Magic key"),
+          bindItem("trg_key", "Tecla Trigger", "Trigger key")
         ]
       },
       {
         es: "Jugador / menu",
         en: "Player / menu",
         items: [
-          item("NoclipBind", "Tecla Noclip (VK)", "Noclip key (VK)", "int", { min: 0, max: 255 }),
-          item("mnkey", "Tecla menu (VK)", "Menu key (VK)", "int", { min: 0, max: 255 }),
-          item("gen_panic", "Tecla panico (VK)", "Panic key (VK)", "int", { min: 0, max: 255 }),
-          item("veh_carry_bind", "Tecla lanzar coche (VK)", "Carry vehicle key (VK)", "int", { min: 0, max: 255 })
+          bindItem("NoclipBind", "Tecla Noclip", "Noclip key"),
+          bindItem("mnkey", "Tecla menu", "Menu key"),
+          bindItem("gen_panic", "Tecla panico", "Panic key"),
+          bindItem("veh_carry_bind", "Tecla lanzar coche", "Carry vehicle key")
         ]
       },
       {
-        es: "Quick binds (VK)",
-        en: "Quick binds (VK)",
+        es: "Quick binds",
+        en: "Quick binds",
         items: [
-          item("qb_visuals", "Quick: ESP", "Quick: ESP", "int", { min: 0, max: 255 }),
-          item("qb_godmode", "Quick: Godmode", "Quick: Godmode", "int", { min: 0, max: 255 }),
-          item("qb_invisible", "Quick: Invisible", "Quick: Invisible", "int", { min: 0, max: 255 }),
-          item("qb_noclip", "Quick: Noclip", "Quick: Noclip", "int", { min: 0, max: 255 }),
-          item("qb_veh_tuning", "Quick: Tuneo vehiculo", "Quick: Vehicle tuning", "int", { min: 0, max: 255 })
+          bindItem("qb_visuals", "Quick: ESP", "Quick: ESP"),
+          bindItem("qb_godmode", "Quick: Godmode", "Quick: Godmode"),
+          bindItem("qb_invisible", "Quick: Invisible", "Quick: Invisible"),
+          bindItem("qb_noclip", "Quick: Noclip", "Quick: Noclip"),
+          bindItem("qb_veh_tuning", "Quick: Tuneo vehiculo", "Quick: Vehicle tuning")
         ]
       },
       {
         es: "Macro strafe",
         en: "Strafe macro",
         items: [
-          item("macro_strafe_start_bind", "Inicio macro (VK)", "Macro start (VK)", "int", { min: 0, max: 255 }),
-          item("macro_strafe_stop_bind", "Parar macro (VK)", "Macro stop (VK)", "int", { min: 0, max: 255 })
+          bindItem("macro_strafe_start_bind", "Inicio macro", "Macro start"),
+          bindItem("macro_strafe_stop_bind", "Parar macro", "Macro stop")
         ]
       }
     ]
