@@ -30,7 +30,7 @@ const weaponPresets = {
 const { extraSections, extraCategoryPatches } = require("./panel-schema-extra");
 
 module.exports = {
-  version: 3,
+  version: 4,
   categories: [
     { id: "combat", es: "Combate", en: "Combat", sections: [0, 1, 2, 3] },
     { id: "visuals", es: "Visuales", en: "Visuals", sections: [4, ...extraCategoryPatches.visuals] },
