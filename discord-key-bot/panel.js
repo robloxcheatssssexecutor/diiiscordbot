@@ -352,6 +352,35 @@ function mountPanelApi(app, deps) {
       res.status(503).type("text/plain").send("Showcase no disponible. Redespliega el bot con showcase/index.html.");
     }
   });
+
+  const homeCandidates = [
+    path.join(__dirname, "home", "index.html"),
+    path.join(__dirname, "public", "home", "index.html")
+  ];
+  let homeHtmlCached = null;
+
+  function resolveHomeHtmlPath() {
+    for (const candidate of homeCandidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  function getHomeHtml() {
+    if (homeHtmlCached) return homeHtmlCached;
+    const homeHtmlPath = resolveHomeHtmlPath();
+    if (!homeHtmlPath) throw new Error("home index.html not found in deploy");
+    return (homeHtmlCached = fs.readFileSync(homeHtmlPath, "utf8"));
+  }
+
+  app.get("/", (_req, res) => {
+    try {
+      res.type("html").send(getHomeHtml());
+    } catch (err) {
+      console.error("[panel] home error:", err.message);
+      res.redirect("/panel");
+    }
+  });
 }
 
 module.exports = {
