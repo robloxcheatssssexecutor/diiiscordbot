@@ -200,15 +200,39 @@ function defaultPriceTable() {
   };
 }
 
+function defaultWebPrices() {
+  return {
+    product1: { name: "Producto 1", week: 12, monthly: 28, lifetime: 90 },
+    product2: { name: "Producto 2", week: 15, monthly: 32, lifetime: 100 }
+  };
+}
+
 function defaultPricesPayload() {
   return {
     base: defaultPriceTable(),
+    web: defaultWebPrices(),
     offer: {
       discountPercent: 0,
       durationText: "",
       endsAt: null
     }
   };
+}
+
+function normalizeWebPrices(web) {
+  const defaults = defaultWebPrices();
+  const out = {};
+  for (const key of ["product1", "product2"]) {
+    const src = web && web[key] ? web[key] : {};
+    const def = defaults[key];
+    out[key] = {
+      name: String(src.name || def.name),
+      week: Number.isFinite(Number(src.week)) ? Number(src.week) : def.week,
+      monthly: Number.isFinite(Number(src.monthly)) ? Number(src.monthly) : def.monthly,
+      lifetime: Number.isFinite(Number(src.lifetime)) ? Number(src.lifetime) : def.lifetime
+    };
+  }
+  return out;
 }
 
 function ensurePrices() {
@@ -241,6 +265,7 @@ function readPrices() {
   if (parsed && parsed.base && parsed.offer) {
     return {
       base: { ...defaultPriceTable(), ...parsed.base },
+      web: normalizeWebPrices(parsed.web),
       offer: {
         discountPercent: Number(parsed.offer.discountPercent || 0),
         durationText: parsed.offer.durationText || "",
@@ -253,6 +278,7 @@ function readPrices() {
   // Backward compatibility for old flat format.
   return {
     base: { ...defaultPriceTable(), ...parsed },
+    web: normalizeWebPrices(parsed.web),
     offer: {
       discountPercent: 0,
       durationText: "",
@@ -260,6 +286,28 @@ function readPrices() {
       expiredNotified: false
     }
   };
+}
+
+function getWebPricesPayload() {
+  const prices = readPrices();
+  const discount = getActiveDiscount(prices);
+  const web = normalizeWebPrices(prices.web);
+  const out = {};
+  for (const [id, product] of Object.entries(web)) {
+    const apply = (v) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return "—";
+      if (!discount) return Number(n.toFixed(2));
+      return Number((n * (1 - discount / 100)).toFixed(2));
+    };
+    out[id] = {
+      name: product.name,
+      week: apply(product.week),
+      monthly: apply(product.monthly),
+      lifetime: apply(product.lifetime)
+    };
+  }
+  return { products: out, offer: prices.offer, discountActive: discount > 0, discountPercent: discount };
 }
 
 function writePrices(prices) {
@@ -897,13 +945,18 @@ app.post("/api/license/validate", (req, res) => {
   });
 });
 
+app.get("/api/web/prices", (_req, res) => {
+  res.json({ ok: true, ...getWebPricesPayload() });
+});
+
 mountPanelApi(app, {
   express,
   normalizeKey,
   getKeyRecord,
   readDb,
   writeDb,
-  getClientIp
+  getClientIp,
+  getWebPricesPayload
 });
 
 const client = new Client({
@@ -956,6 +1009,32 @@ client.once("ready", async () => {
       .addNumberOption((o) => o.setName("descuento").setDescription("Discount percentage").setRequired(true))
       .addStringOption((o) => o.setName("duracion").setDescription("Duration e.g. 7d, 24h").setRequired(true)),
     new SlashCommandBuilder().setName("offeroff").setDescription("Disable current active offer."),
+    new SlashCommandBuilder()
+      .setName("webprices")
+      .setDescription("Set web landing page product prices.")
+      .addStringOption((o) =>
+        o
+          .setName("producto")
+          .setDescription("product1 or product2")
+          .setRequired(true)
+          .addChoices(
+            { name: "Producto 1", value: "product1" },
+            { name: "Producto 2", value: "product2" }
+          )
+      )
+      .addStringOption((o) =>
+        o
+          .setName("plan")
+          .setDescription("week, monthly or lifetime")
+          .setRequired(true)
+          .addChoices(
+            { name: "Week", value: "week" },
+            { name: "Monthly", value: "monthly" },
+            { name: "Lifetime", value: "lifetime" }
+          )
+      )
+      .addNumberOption((o) => o.setName("precio").setDescription("Price in EUR").setRequired(true))
+      .addStringOption((o) => o.setName("nombre").setDescription("Optional display name for the product")),
     new SlashCommandBuilder()
       .setName("compraseveryone")
       .setDescription("Show purchase history for all users.")
@@ -1127,6 +1206,7 @@ client.on("interactionCreate", async (interaction) => {
               "`/tablapreciosset`",
               "`/oferta`",
               "`/offeroff`",
+              "`/webprices`",
               "`/keygen` `/keylist` `/keycheck` `/keydel` `/resethwid`",
               "`/compraseveryone`"
             ].join("\n"),
@@ -1216,6 +1296,27 @@ client.on("interactionCreate", async (interaction) => {
       pricesPayload.offer = { discountPercent: 0, durationText: "", endsAt: null, expiredNotified: true };
       writePrices(pricesPayload);
       await interaction.reply({ content: "Offer disabled." });
+      return;
+    }
+
+    if (slashCommand === "webprices") {
+      const pricesPayload = readPrices();
+      const productId = interaction.options.getString("producto", true);
+      const plan = interaction.options.getString("plan", true);
+      const amount = interaction.options.getNumber("precio", true);
+      const name = interaction.options.getString("nombre");
+      if (!Number.isFinite(amount) || amount < 0) {
+        await interaction.reply({ content: "Precio invalido." });
+        return;
+      }
+      pricesPayload.web = normalizeWebPrices(pricesPayload.web);
+      pricesPayload.web[productId][plan] = Number(amount.toFixed(2));
+      if (name && name.trim()) pricesPayload.web[productId].name = name.trim();
+      writePrices(pricesPayload);
+      const p = pricesPayload.web[productId];
+      await interaction.reply({
+        content: `Web actualizada: **${p.name}** · ${plan} = **${p[plan]}€**`
+      });
       return;
     }
 
