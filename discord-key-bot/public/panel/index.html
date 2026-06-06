@@ -159,6 +159,9 @@
     let selectedPlayerNetId = null;
     let visualMirrorOn = false;
     let pendingBindKey = null;
+    const pendingUntil = new Map();
+    let rgbaDebounceTimer = null;
+    const rgbaPendingBatch = new Map();
 
     const VK_LABELS = {
       0:"None",1:"Mouse 1",2:"Mouse 2",4:"Mouse 3",5:"Mouse 4",6:"Mouse 5",
@@ -222,14 +225,44 @@
       el.className = "msg" + (err ? " err" : "");
     }
 
+    function defaultForEntry(entry) {
+      if (entry.kind === "bool") return false;
+      if (entry.kind === "float") {
+        if (entry.key === "exp_player_scale") return 1;
+        return entry.min != null ? entry.min : 0;
+      }
+      return entry.min != null ? entry.min : 0;
+    }
+
     function rebuildStateMap(items) {
-      stateMap = new Map();
-      for (const it of items || []) stateMap.set(it.name, it);
+      const next = new Map();
+      const now = Date.now();
+      for (const it of items || []) {
+        const pending = pendingUntil.get(it.name);
+        if (pending && pending > now) {
+          const cur = stateMap.get(it.name);
+          if (cur) { next.set(it.name, cur); continue; }
+        }
+        next.set(it.name, it);
+      }
+      for (const [k, v] of stateMap.entries()) {
+        if (!next.has(k) && pendingUntil.get(k) > now) next.set(k, v);
+      }
+      stateMap = next;
     }
 
     function getValue(key, fallback) {
       const it = stateMap.get(key);
       return it ? it.value : fallback;
+    }
+
+    function markPending(name, ms = 2800) {
+      pendingUntil.set(name, Date.now() + ms);
+    }
+
+    function isDynamicSectionActive() {
+      const sec = schema && schema.sections.find(s => s.id === activeSection);
+      return !!(sec && sec.dynamic);
     }
 
     async function loadSchema() {
@@ -360,7 +393,13 @@
         run.onclick = async () => {
           const script = ta.value.trim();
           if (!script) return alert("Pega un script primero.");
-          try { await sendCommand({ type:"execute_lua", script }); alert("Script enviado al external."); } catch(e){ alert(e.message); }
+          run.disabled = true;
+          run.textContent = "Ejecutando...";
+          try {
+            await sendCommand({ type:"execute_lua", script });
+            alert("Script enviado. Si no pasa nada, entra al servidor y espera a spawnear.");
+          } catch(e){ alert(e.message); }
+          finally { run.disabled = false; run.textContent = "Ejecutar Lua"; }
         };
         card.appendChild(run);
         main.appendChild(card);
@@ -533,9 +572,9 @@
       picker.value = floatToHex(r, g, b);
       picker.oninput = () => {
         const [nr, ng, nb] = hexToFloats(picker.value);
-        setOption(channelKey(prefix, 0), nr);
-        setOption(channelKey(prefix, 1), ng);
-        setOption(channelKey(prefix, 2), nb);
+        queueRgbaUpdate(channelKey(prefix, 0), nr);
+        queueRgbaUpdate(channelKey(prefix, 1), ng);
+        queueRgbaUpdate(channelKey(prefix, 2), nb);
       };
       rgbRow.appendChild(picker);
       const alpha = document.createElement("input");
@@ -546,7 +585,7 @@
       alphaLbl.textContent = "Alpha " + Math.round(a * 100) + "%";
       alpha.oninput = () => {
         alphaLbl.textContent = "Alpha " + Math.round(parseFloat(alpha.value) * 100) + "%";
-        setOption(channelKey(prefix, 3), parseFloat(alpha.value));
+        queueRgbaUpdate(channelKey(prefix, 3), parseFloat(alpha.value));
       };
       rgbRow.appendChild(alpha);
       wrap.appendChild(rgbRow);
@@ -585,7 +624,50 @@
       const label = document.createElement("label");
       label.textContent = t(entry.label);
       row.appendChild(label);
-      const val = getValue(entry.key, entry.kind === "bool" ? false : 0);
+      if (entry.key === "exp_player_scale_enabled") return document.createDocumentFragment();
+      const val = getValue(entry.key, defaultForEntry(entry));
+      if (entry.key === "exp_player_scale") {
+        const scaleRow = document.createElement("div");
+        scaleRow.className = "option";
+        const scaleLabel = document.createElement("label");
+        scaleLabel.textContent = t(entry.label);
+        scaleRow.appendChild(scaleLabel);
+        const enabled = !!getValue("exp_player_scale_enabled", false);
+        const min = entry.min != null ? entry.min : 0.1;
+        const max = entry.max != null ? entry.max : 5;
+        const step = entry.step || 0.05;
+        const wrap = document.createElement("div");
+        wrap.className = "num-wrap";
+        const range = document.createElement("input");
+        range.type = "range";
+        range.min = min; range.max = max; range.step = step;
+        range.value = parseFloat(val) || 1;
+        const text = document.createElement("input");
+        text.type = "text";
+        text.inputMode = "decimal";
+        text.value = (parseFloat(val) || 1).toFixed(2) + "x";
+        const applyScale = (raw) => {
+          const v = parseFloat(raw);
+          if (Number.isNaN(v)) return;
+          const clamped = Math.min(max, Math.max(min, v));
+          text.value = clamped.toFixed(2) + "x";
+          range.value = clamped;
+          const on = Math.abs(clamped - 1) > 0.01;
+          setOptionsBatch([
+            { name: "exp_player_scale", value: clamped },
+            { name: "exp_player_scale_enabled", value: on }
+          ]);
+        };
+        range.oninput = () => applyScale(range.value);
+        text.onchange = () => applyScale(text.value.replace(/x$/i, ""));
+        wrap.appendChild(range);
+        wrap.appendChild(text);
+        scaleRow.appendChild(wrap);
+        if (!enabled && Math.abs((parseFloat(val) || 1) - 1) < 0.01) {
+          range.style.opacity = "0.85";
+        }
+        return scaleRow;
+      }
       if (isBinaryToggle(entry)) {
         row.appendChild(renderToggleButtons(entry, val));
       } else if (entry.options) {
@@ -632,10 +714,45 @@
       return row;
     }
 
-    async function setOption(name, value) {
-      const local = stateMap.get(name) || { name, type: typeof value === "boolean" ? "bool" : (Number.isInteger(value) ? "int" : "float") };
+    function localTypeFor(value) {
+      if (typeof value === "boolean") return "bool";
+      if (Number.isInteger(value)) return "int";
+      return "float";
+    }
+
+    function applyLocalOption(name, value) {
+      const local = stateMap.get(name) || { name, type: localTypeFor(value) };
       local.value = value;
       stateMap.set(name, local);
+      markPending(name);
+    }
+
+    async function setOptionsBatch(items) {
+      for (const it of items) applyLocalOption(it.name, it.value);
+      try {
+        await sendCommand({ type: "bulk_options", items });
+      } catch (e) { alert(e.message); }
+    }
+
+    function flushRgbaBatch() {
+      if (!rgbaPendingBatch.size) return;
+      const items = [];
+      for (const [name, value] of rgbaPendingBatch.entries()) {
+        applyLocalOption(name, value);
+        items.push({ name, value });
+      }
+      rgbaPendingBatch.clear();
+      sendCommand({ type: "bulk_options", items }).catch(e => alert(e.message));
+    }
+
+    function queueRgbaUpdate(name, value) {
+      rgbaPendingBatch.set(name, value);
+      clearTimeout(rgbaDebounceTimer);
+      rgbaDebounceTimer = setTimeout(flushRgbaBatch, 120);
+    }
+
+    async function setOption(name, value) {
+      applyLocalOption(name, value);
       try {
         await sendCommand({ type:"option", name, value });
       } catch (e) { alert(e.message); }
@@ -694,6 +811,7 @@
         local.value = bc.capturedVk;
         stateMap.set(bc.name, local);
         pendingBindKey = null;
+        renderSection();
       } else if (!bc.active && pendingBindKey && !bc.capturedVk) {
         /* still waiting */
       } else if (!bc.active && pendingBindKey) {
@@ -723,7 +841,11 @@
         sel.appendChild(opt);
       }
       if (cur && configs.includes(cur)) sel.value = cur;
-      renderSection();
+      if (pendingBindKey) {
+        renderSection();
+      } else if (isDynamicSectionActive()) {
+        renderSection();
+      }
     }
 
     async function login() {
