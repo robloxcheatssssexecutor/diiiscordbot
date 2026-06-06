@@ -22,6 +22,11 @@ const strafeModes = {
   en: ["Toggle (start / stop)", "Hold (keep key pressed)"]
 };
 
+const espPosOptions = {
+  es: ["Abajo", "Arriba", "Izq. superior", "Der. superior", "Izq. inferior", "Der. inferior"],
+  en: ["Bottom", "Top", "Left Upper", "Right Upper", "Left Lower", "Right Lower"]
+};
+
 const weaponPresets = {
   es: ["WEAPON_PISTOL", "WEAPON_COMBATPISTOL", "WEAPON_SMG", "WEAPON_ASSAULTRIFLE", "WEAPON_CARBINERIFLE", "WEAPON_PUMPSHOTGUN", "WEAPON_SNIPERRIFLE", "WEAPON_STUNGUN", "WEAPON_KNIFE", "WEAPON_GRENADE"],
   en: ["WEAPON_PISTOL", "WEAPON_COMBATPISTOL", "WEAPON_SMG", "WEAPON_ASSAULTRIFLE", "WEAPON_CARBINERIFLE", "WEAPON_PUMPSHOTGUN", "WEAPON_SNIPERRIFLE", "WEAPON_STUNGUN", "WEAPON_KNIFE", "WEAPON_GRENADE"]
@@ -30,7 +35,7 @@ const weaponPresets = {
 const { extraSections, extraCategoryPatches } = require("./panel-schema-extra");
 
 module.exports = {
-  version: 4,
+  version: 5,
   categories: [
     { id: "combat", es: "Combate", en: "Combat", sections: [0, 1, 2, 3] },
     { id: "visuals", es: "Visuales", en: "Visuals", sections: [4, ...extraCategoryPatches.visuals] },
@@ -226,7 +231,11 @@ module.exports = {
             item("esp_players_snapline_thick", "Grosor snapline", "Snapline thickness", "float", { min: 0.5, max: 5, step: 0.1 }),
             item("esp_players_headcircle_thick", "Grosor circulo cabeza", "Head circle thickness", "float", { min: 0.5, max: 5, step: 0.1 }),
             item("esp_players_pos_offx", "Offset X ESP", "ESP offset X", "float", { min: -50, max: 50, step: 1 }),
-            item("esp_players_pos_offy", "Offset Y ESP", "ESP offset Y", "float", { min: -50, max: 50, step: 1 })
+            item("esp_players_pos_offy", "Offset Y ESP", "ESP offset Y", "float", { min: -50, max: 50, step: 1 }),
+            item("esp_players_name_pos", "Posicion nombre", "Name position", "int", { min: 0, max: 5, options: espPosOptions }),
+            item("esp_players_weapon_pos", "Posicion arma", "Weapon position", "int", { min: 0, max: 5, options: espPosOptions }),
+            item("esp_players_distance_pos", "Posicion distancia", "Distance position", "int", { min: 0, max: 5, options: espPosOptions }),
+            item("esp_players_health_pos", "Posicion barra vida", "Health bar position", "int", { min: 0, max: 5, options: espPosOptions })
           ]
         },
         {
@@ -268,6 +277,8 @@ module.exports = {
             item("God", "Godmode completo (inestable)", "Full Godmode"),
             item("exp_infinite_stamina", "Stamina Infinita", "Infinite Stamina"),
             item("exp_shrink", "Jugador Pequeño (Tiny)", "Tiny Player"),
+            item("exp_player_scale_enabled", "Tamaño del personaje", "Player size scale"),
+            item("exp_player_scale", "Escala del personaje", "Player scale value", "float", { min: 0.1, max: 5, step: 0.05 }),
             item("exp_super_jump", "Super Salto", "Super Jump"),
             item("exp_no_collision", "Atravesar Paredes", "No Collision"),
             item("exp_no_ragdoll", "No radgoll", "No Ragdoll"),
@@ -331,6 +342,7 @@ module.exports = {
             item("veh_boost", "Velocidad del coche", "Vehicle Boost", "float", { min: 0, max: 50, step: 0.1 }),
             item("veh_traction", "Grip al suelo (Handling)", "Traction", "float", { min: 0, max: 10, step: 0.1 }),
             item("veh_color_enabled", "Cambiar Color del Vehiculo", "Vehicle Color"),
+            item("veh_primary_enabled", "Color primario activo", "Primary color enabled"),
             item("veh_primary_r", "Color primario R", "Primary R", "int", { min: 0, max: 255 }),
             item("veh_primary_g", "Color primario G", "Primary G", "int", { min: 0, max: 255 }),
             item("veh_primary_b", "Color primario B", "Primary B", "int", { min: 0, max: 255 }),
@@ -344,6 +356,9 @@ module.exports = {
             item("veh_fix", "Reparar Estado", "Repair State"),
             item("veh_godmode", "Godmode del Vehiculo", "Vehicle Godmode"),
             item("veh_engine_fix", "Reparar Motor", "Engine Fix"),
+            item("veh_petrol_fix", "Reparar deposito gasolina", "Petrol tank fix"),
+            item("veh_oil_fix", "Reparar deposito aceite", "Oil tank fix"),
+            item("veh_water_fix", "Reparar deposito agua", "Water tank fix"),
             item("veh_never_explode", "Nunca Explodir", "Never Explode")
           ]
         }
@@ -430,6 +445,7 @@ module.exports = {
             item("gpu_capt_bypass", "Stream Proof Nvidia/AMD", "GPU Stream Proof"),
             item("second_monitor", "Modo Segundo Monitor", "Second Monitor"),
             item("hide_menu_unfocused", "Ocultar menu al cambiar de ventana", "Hide menu when unfocused"),
+            item("mobile_control_only", "Solo control movil (ocultar menu PC)", "Mobile-only control (hide PC menu)"),
             item("thd_delay", "Retraso del Procesamiento", "Thread Delay", "int", { min: 0, max: 100 }),
             item("login_orange_particles", "Particulas login", "Login particles")
           ]
