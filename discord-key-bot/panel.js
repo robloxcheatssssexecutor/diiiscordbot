@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const fs = require("fs");
 const path = require("path");
 const panelSchema = require("./panel-schema");
 
@@ -319,9 +320,20 @@ function mountPanelApi(app, deps) {
   });
 
   const showcaseDir = path.join(__dirname, "public", "showcase");
-  app.use("/showcase", deps.express.static(showcaseDir));
-  app.get("/showcase", (_req, res) => {
-    res.sendFile(path.join(showcaseDir, "index.html"));
+  const showcaseHtmlPath = path.join(showcaseDir, "index.html");
+  let showcaseHtmlCached = null;
+
+  function getShowcaseHtml() {
+    if (showcaseHtmlCached) return showcaseHtmlCached;
+    const raw = fs.readFileSync(showcaseHtmlPath, "utf8");
+    const schemaJson = JSON.stringify(panelSchema).replace(/</g, "\\u003c");
+    showcaseHtmlCached = raw.replace("/*__INLINE_SCHEMA__*/null", schemaJson);
+    return showcaseHtmlCached;
+  }
+
+  app.use("/showcase", deps.express.static(showcaseDir, { index: false }));
+  app.get(["/showcase", "/showcase/"], (_req, res) => {
+    res.type("html").send(getShowcaseHtml());
   });
 }
 
