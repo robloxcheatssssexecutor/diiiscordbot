@@ -317,6 +317,12 @@ function mountPanelApi(app, deps) {
   app.get("/panel", (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "panel", "index.html"));
   });
+
+  const showcaseDir = path.join(__dirname, "public", "showcase");
+  app.use("/showcase", deps.express.static(showcaseDir));
+  app.get("/showcase", (_req, res) => {
+    res.sendFile(path.join(showcaseDir, "index.html"));
+  });
 }
 
 module.exports = {
