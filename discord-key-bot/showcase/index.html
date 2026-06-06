@@ -170,7 +170,8 @@
       border-bottom: 1px solid rgba(255,255,255,.04);
     }
     .option label { font-size: 0.82rem; flex: 1; color: var(--text); }
-    .ctrl { flex-shrink: 0; pointer-events: none; opacity: 0.85; }
+    .ctrl { flex-shrink: 0; }
+    .option .ctrl.toggle, .option .ctrl.slider-wrap, .option .ctrl.fake-btn { pointer-events: none; opacity: 0.85; }
     .toggle {
       width: 40px; height: 22px;
       background: #303040;
@@ -256,7 +257,7 @@
 
   <div class="hud-brand">
     <img src="https://i.imgur.com/Nuy61wA.png" alt="Falcao" />
-    <span><span class="accent">Falcao External</span> · 00:42:18 · 14:32</span>
+    <span><span class="accent">Falcao External</span> · <span id="hudPlaytime">00:00:00</span> · <span id="hudClock">--:--</span></span>
   </div>
 
   <div class="hud-binds">
@@ -291,15 +292,12 @@
   </div>
 
   <script>
+    const INLINE_SCHEMA = /*__INLINE_SCHEMA__*/null;
     const LANG = "es";
-    const SIDEBAR_GROUPS = [
-      { icon: "fa-crosshairs", label: "Combate", sections: [0, 1, 2, 3] },
-      { icon: "fa-eye", label: "Visuales", sections: [4, 14, 15] },
-      { icon: "fa-bolt", label: "Exploits", sections: [5, 6, 7, 8] },
-      { icon: "fa-sliders", label: "Misc", sections: [9, 10, 11, 12, 13, 16] }
-    ];
+    const GROUP_ICONS = { combat: "fa-crosshairs", visuals: "fa-eye", exploits: "fa-bolt", misc: "fa-sliders" };
 
     let schema = null;
+    const sessionStart = Date.now();
     let activeSection = 0;
     let expandedGroup = 0;
     const demoValues = new Map();
@@ -390,12 +388,13 @@
     function renderSidebar() {
       const nav = document.getElementById("sidebar");
       nav.innerHTML = "";
-      SIDEBAR_GROUPS.forEach((grp, gi) => {
+      (schema.categories || []).forEach((cat, gi) => {
         const wrap = document.createElement("div");
         wrap.className = "sb-group";
         const hdr = document.createElement("div");
         hdr.className = "sb-group-hdr" + (expandedGroup === gi ? " open" : "");
-        hdr.innerHTML = `<i class="fa-solid ${grp.icon}"></i><span>${grp.label}</span><i class="fa-solid fa-chevron-down" style="margin-left:auto;font-size:.65rem"></i>`;
+        const icon = GROUP_ICONS[cat.id] || "fa-folder";
+        hdr.innerHTML = `<i class="fa-solid ${icon}"></i><span>${t(cat)}</span><i class="fa-solid fa-chevron-down" style="margin-left:auto;font-size:.65rem"></i>`;
         hdr.onclick = () => {
           expandedGroup = expandedGroup === gi ? -1 : gi;
           renderSidebar();
@@ -405,7 +404,7 @@
         if (expandedGroup === gi) {
           const items = document.createElement("div");
           items.className = "sb-items";
-          for (const sid of grp.sections) {
+          for (const sid of cat.sections || []) {
             const sec = schema.sections.find(s => s.id === sid);
             if (!sec) continue;
             const btn = document.createElement("button");
@@ -421,17 +420,45 @@
       });
     }
 
+    function pad2(n) { return String(n).padStart(2, "0"); }
+
+    function tickHudClock() {
+      const now = new Date();
+      const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+      const h = Math.floor(elapsed / 3600);
+      const m = Math.floor((elapsed % 3600) / 60);
+      const s = elapsed % 60;
+      const play = document.getElementById("hudPlaytime");
+      const clk = document.getElementById("hudClock");
+      if (play) play.textContent = pad2(h) + ":" + pad2(m) + ":" + pad2(s);
+      if (clk) clk.textContent = pad2(now.getHours()) + ":" + pad2(now.getMinutes());
+    }
+
+    async function loadSchema() {
+      if (INLINE_SCHEMA) return INLINE_SCHEMA;
+      const urls = ["/api/panel/schema", "https://falcaobot.onrender.com/api/panel/schema"];
+      for (const url of urls) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (data.schema) return data.schema;
+        } catch (_) {}
+      }
+      throw new Error("schema");
+    }
+
     async function init() {
-      const res = await fetch("/api/panel/schema");
-      const data = await res.json();
-      schema = data.schema;
+      schema = await loadSchema();
       activeSection = 0;
       expandedGroup = 0;
+      tickHudClock();
+      setInterval(tickHudClock, 1000);
       renderSection();
     }
 
     init().catch(() => {
-      document.getElementById("content").innerHTML = "<p style='color:#ff5d5d'>No se pudo cargar el schema del menu.</p>";
+      document.getElementById("content").innerHTML = "<p style='color:#ff5d5d'>No se pudo cargar el menu. Usa /showcase en el servidor (no el archivo local).</p>";
     });
   </script>
 </body>
