@@ -319,21 +319,38 @@ function mountPanelApi(app, deps) {
     res.sendFile(path.join(__dirname, "public", "panel", "index.html"));
   });
 
-  const showcaseDir = path.join(__dirname, "public", "showcase");
-  const showcaseHtmlPath = path.join(showcaseDir, "index.html");
+  const showcaseCandidates = [
+    path.join(__dirname, "showcase", "index.html"),
+    path.join(__dirname, "public", "showcase", "index.html")
+  ];
   let showcaseHtmlCached = null;
+
+  function resolveShowcaseHtmlPath() {
+    for (const candidate of showcaseCandidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
+  }
 
   function getShowcaseHtml() {
     if (showcaseHtmlCached) return showcaseHtmlCached;
+    const showcaseHtmlPath = resolveShowcaseHtmlPath();
+    if (!showcaseHtmlPath) {
+      throw new Error("showcase index.html not found in deploy");
+    }
     const raw = fs.readFileSync(showcaseHtmlPath, "utf8");
     const schemaJson = JSON.stringify(panelSchema).replace(/</g, "\\u003c");
     showcaseHtmlCached = raw.replace("/*__INLINE_SCHEMA__*/null", schemaJson);
     return showcaseHtmlCached;
   }
 
-  app.use("/showcase", deps.express.static(showcaseDir, { index: false }));
   app.get(["/showcase", "/showcase/"], (_req, res) => {
-    res.type("html").send(getShowcaseHtml());
+    try {
+      res.type("html").send(getShowcaseHtml());
+    } catch (err) {
+      console.error("[panel] showcase error:", err.message);
+      res.status(503).type("text/plain").send("Showcase no disponible. Redespliega el bot con showcase/index.html.");
+    }
   });
 }
 
