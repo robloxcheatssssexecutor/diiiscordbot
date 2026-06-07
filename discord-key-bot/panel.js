@@ -3,8 +3,9 @@ const fs = require("fs");
 const path = require("path");
 const panelSchema = require("./panel-schema");
 
-const PANEL_CLIENT_TTL_MS = 45 * 1000;
-const PANEL_WEB_TTL_MS = 4 * 60 * 60 * 1000;
+const PANEL_CLIENT_TTL_MS = 90 * 1000;
+const PANEL_WEB_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PANEL_WEB_SLIDE_MS = 24 * 60 * 60 * 1000;
 const PANEL_MAX_COMMANDS = 200;
 const PANEL_MAX_COMMANDS_PER_REQUEST = 64;
 
@@ -261,6 +262,7 @@ function mountPanelApi(app, deps) {
     }
 
     session.lastWebSeen = Date.now();
+    session.webExpiresAt = Date.now() + PANEL_WEB_SLIDE_MS;
     res.json({
       ok: true,
       clientOnline: isClientOnline(session),
@@ -283,6 +285,7 @@ function mountPanelApi(app, deps) {
     }
 
     session.lastWebSeen = Date.now();
+    session.webExpiresAt = Date.now() + PANEL_WEB_SLIDE_MS;
     const body = req.body || {};
     let commands = [];
 
