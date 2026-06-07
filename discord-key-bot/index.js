@@ -37,7 +37,7 @@ const TICKET_CATEGORY_BUG = "Bug Tickets";
 const BUY_CHANNEL_LINK = "https://discord.com/channels/1502005944945741864/1502007586613100675";
 
 if (!TOKEN) {
-  throw new Error("Missing DISCORD_TOKEN in .env");
+  console.error("[discord] DISCORD_TOKEN no configurado — la web seguira activa pero el bot no arrancara.");
 }
 
 function resolveDataDir() {
@@ -580,6 +580,10 @@ async function logError(context, error, extra = {}) {
   }
   fields.push({ name: "Stack", value: `\`\`\`${stack}\`\`\``, inline: false });
   const embed = baseLogEmbed("Bot Error", 0xed4245).addFields(fields);
+  if (!client.isReady()) {
+    console.error(`[logError] ${context}: ${reason}`);
+    return;
+  }
   await sendLogEmbed(client, LOG_CHANNEL_ERRORS_ID, embed);
 }
 
@@ -978,7 +982,9 @@ const client = new Client({
 });
 discordClientRef = client;
 
-let apiServerStarted = false;
+app.listen(API_PORT, "0.0.0.0", () => {
+  console.log(`HTTP API online on port ${API_PORT} (bind 0.0.0.0)`);
+});
 
 client.once("ready", async () => {
   try {
@@ -988,12 +994,6 @@ client.once("ready", async () => {
     logError("backup_discord_restore", error).catch(() => {});
   }
   logDatabaseStatus();
-  if (!apiServerStarted) {
-    app.listen(API_PORT, () => {
-      console.log(`HTTP API online on port ${API_PORT}`);
-    });
-    apiServerStarted = true;
-  }
   if (!process.env.DISCORD_CLIENT_ID && client.application?.id) {
     process.env.DISCORD_CLIENT_ID = client.application.id;
     console.log(`[manage] DISCORD_CLIENT_ID auto: ${client.application.id}`);
@@ -1183,7 +1183,11 @@ process.on("uncaughtException", (error) => {
   logError("process.uncaughtException", error).catch(() => {});
 });
 
-client.login(TOKEN);
+if (TOKEN) {
+  client.login(TOKEN).catch((error) => {
+    console.error("[discord] Login fallido:", error.message);
+  });
+}
 
 client.on("interactionCreate", async (interaction) => {
   try {
