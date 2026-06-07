@@ -6,5 +6,17 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      - key: NODE_VERSION
+        value: "20"
       - key: KEYS_BACKUP_CHANNEL_ID
         value: "1511740812621250712"
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: MENU_API_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: BASE_URL
+        sync: false
