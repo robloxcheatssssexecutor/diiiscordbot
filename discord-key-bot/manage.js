@@ -1,5 +1,30 @@
 const crypto = require("crypto");
+const fs = require("fs");
 const path = require("path");
+
+let manageHtmlCached = null;
+
+function getManageHtml() {
+  if (manageHtmlCached) return manageHtmlCached;
+  const candidates = [
+    path.join(__dirname, "manage", "index.html"),
+    path.join(__dirname, "public", "manage", "index.html")
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return (manageHtmlCached = fs.readFileSync(candidate, "utf8"));
+      }
+    } catch (_) {
+      /* try next */
+    }
+  }
+  try {
+    return (manageHtmlCached = require("./manage-page"));
+  } catch (_) {
+    return null;
+  }
+}
 
 const MANAGE_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
@@ -135,11 +160,14 @@ function mountManageApi(app, deps) {
 
   setInterval(cleanupManageSessions, 60 * 1000).unref();
 
-  app.get("/manage", (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "manage", "index.html"));
+  app.get(["/manage", "/manage/"], (_req, res) => {
+    const html = getManageHtml();
+    if (!html) {
+      res.status(503).type("text/plain").send("Manage no disponible.");
+      return;
+    }
+    res.type("html").send(html);
   });
-
-  app.use("/manage", express.static(path.join(__dirname, "public", "manage")));
 
   app.get("/api/manage/auth/status", (req, res) => {
     const session = getManageSession(req);
