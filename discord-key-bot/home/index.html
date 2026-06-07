@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Falcao External</title>
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png" />
+  <link rel="preconnect" href="https://i.imgur.com" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&display=swap" rel="stylesheet" />
   <style>
@@ -158,13 +160,14 @@
   <canvas id="bgCanvas"></canvas>
   <div class="wrap">
     <header class="hero">
-      <img class="logo" src="https://i.imgur.com/Nuy61wA.png" alt="Falcao External" />
+      <img class="logo" src="https://i.imgur.com/0nTvfnO.png" alt="Falcao External" width="88" height="88" loading="eager" />
       <h1>Falcao External</h1>
       <p class="sub">External para FiveM · Panel remoto desde el movil · Control total de tu cheat</p>
       <div class="actions">
         <a class="btn btn-primary" href="/panel">Panel remoto</a>
         <a class="btn btn-secondary" href="/showcase">Ver menu (showcase)</a>
         <a class="btn btn-discord" href="https://discord.gg/falcao" target="_blank" rel="noopener">Discord</a>
+        <a class="btn btn-secondary" href="/manage" style="opacity:.85">Manage</a>
       </div>
       <div id="offerPill" class="offer-pill"></div>
     </header>
@@ -185,7 +188,8 @@
       function resize() {
         w = c.width = window.innerWidth;
         h = c.height = window.innerHeight;
-        pts = Array.from({ length: 48 }, () => ({
+        const n = window.innerWidth < 600 ? 28 : 48;
+        pts = Array.from({ length: n }, () => ({
           x: Math.random() * w, y: Math.random() * h,
           vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35
         }));
