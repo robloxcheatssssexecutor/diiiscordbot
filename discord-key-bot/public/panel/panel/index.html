@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#111318" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png" />
+  <link rel="preconnect" href="https://i.imgur.com" />
   <title>Falcao Remote Panel</title>
   <style>
     :root { --bg:#0f1116; --card:#171a22; --stroke:#2a3040; --text:#eef1f7; --muted:#9aa3b5; --accent:#ff8a33; --accent-dim:rgba(255,138,51,.14); --ok:#3ecf6a; --err:#ff5d5d; }
@@ -12,7 +14,10 @@
     body { margin:0; font-family:Inter,Segoe UI,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; }
     .hidden { display:none !important; }
     .app { max-width:860px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column; }
-    .top { padding:14px 14px 8px; border-bottom:1px solid var(--stroke); background:#12151c; position:sticky; top:0; z-index:10; }
+    .top { padding:14px 14px 8px; border-bottom:1px solid var(--stroke); background:linear-gradient(180deg,#141820,#12151c); position:sticky; top:0; z-index:10; }
+    .top-nav { display:flex; gap:8px; margin-bottom:10px; }
+    .top-nav a { text-decoration:none; font-size:.78rem; font-weight:600; padding:6px 12px; border-radius:999px; border:1px solid var(--stroke); color:var(--muted); transition:border-color .15s,color .15s; }
+    .top-nav a:hover { border-color:var(--accent); color:var(--accent); }
     .brand { display:flex; gap:10px; align-items:center; }
     .brand img { width:38px; height:38px; border-radius:10px; }
     .brand h1 { margin:0; font-size:1rem; }
@@ -84,8 +89,12 @@
 <body>
   <div class="app">
     <div class="top">
+      <div class="top-nav">
+        <a href="/">← Inicio</a>
+        <a href="/showcase">Showcase</a>
+      </div>
       <div class="brand">
-        <img src="https://i.imgur.com/Nuy61wA.png" alt="Falcao" />
+        <img src="https://i.imgur.com/0nTvfnO.png" alt="Falcao" width="38" height="38" loading="eager" />
         <div>
           <h1>Falcao Remote Panel</h1>
           <p>Panel en la nube — control remoto de tu PC</p>
@@ -156,6 +165,8 @@
     let liveMeta = {};
     let activeSection = 0;
     let pollTimer = null;
+    let pollFailCount = 0;
+    let schemaCached = false;
     let selectedPlayerNetId = null;
     let visualMirrorOn = false;
     let pendingBindKey = null;
@@ -266,8 +277,10 @@
     }
 
     async function loadSchema() {
+      if (schemaCached && schema) return;
       const data = await api("/api/panel/schema");
       schema = data.schema;
+      schemaCached = true;
     }
 
     function renderSidebar() {
@@ -813,6 +826,7 @@
 
     async function refreshStatus() {
       const data = await api("/api/panel/web/status");
+      pollFailCount = 0;
       document.getElementById("keyMasked").textContent = data.keyMasked || "—";
       const online = !!data.clientOnline;
       document.getElementById("onlineDot").classList.toggle("on", online);
@@ -855,10 +869,38 @@
         renderVisualMirrorToggle();
         renderSection();
         await refreshStatus();
-        if (pollTimer) clearInterval(pollTimer);
-        pollTimer = setInterval(refreshStatus, 1500);
+        startPolling();
       } catch (e) {
         setLoginMsg(e.message, true);
+      }
+    }
+
+    function pollInterval() {
+      return document.hidden ? 5000 : 2000;
+    }
+
+    let pollTick = null;
+    let visibilityBound = false;
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTick = async () => {
+        try {
+          await refreshStatus();
+        } catch (e) {
+          pollFailCount += 1;
+          if (pollFailCount >= 8) {
+            setLoginMsg("Sesion perdida. Vuelve a conectar.", true);
+            await logout();
+          }
+        }
+      };
+      pollTimer = setInterval(pollTick, pollInterval());
+      if (!visibilityBound) {
+        visibilityBound = true;
+        document.addEventListener("visibilitychange", () => {
+          if (pollTimer) clearInterval(pollTimer);
+          pollTimer = setInterval(pollTick, pollInterval());
+        });
       }
     }
 
@@ -885,17 +927,23 @@
 
     (async function boot() {
       if (!webToken) return;
-      try {
-        await loadSchema();
-        showPanel(true);
-        renderSidebar();
-        renderVisualMirrorToggle();
-        renderSection();
-        await refreshStatus();
-        pollTimer = setInterval(refreshStatus, 1500);
-      } catch (_) {
-        showPanel(false);
+      let ok = false;
+      for (let i = 0; i < 4; i++) {
+        try {
+          await loadSchema();
+          await refreshStatus();
+          ok = true;
+          break;
+        } catch (_) {
+          await new Promise((r) => setTimeout(r, 800));
+        }
       }
+      if (!ok) { showPanel(false); return; }
+      showPanel(true);
+      renderSidebar();
+      renderVisualMirrorToggle();
+      renderSection();
+      startPolling();
     })();
   </script>
 </body>
