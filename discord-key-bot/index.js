@@ -28,6 +28,7 @@ const LOG_CHANNEL_TRANSCRIPTS_ID = "1502007473157177507";
 const LOG_CHANNEL_ERRORS_ID = "1502039396978003979";
 const KEYS_BACKUP_CHANNEL_ID = process.env.KEYS_BACKUP_CHANNEL_ID || "1511740812621250712";
 const KEYS_BACKUP_SCHEMA = "falcao-external-keys-backup-v1";
+const PRICES_BACKUP_SCHEMA = "falcao-external-prices-backup-v1";
 const OFFER_CHANNEL_ID = "1502029921629900890";
 const SUGGESTION_CHANNEL_IDS = new Set(["1502035178309161150", "1502007614047785182"]);
 const TICKET_CATEGORY_BUY = "Buy Tickets";
@@ -240,6 +241,15 @@ function normalizeWebPrices(web) {
 function ensurePrices() {
   ensureDb();
   if (!fs.existsSync(pricesPath)) {
+    const bak = `${pricesPath}.bak`;
+    if (fs.existsSync(bak)) {
+      try {
+        fs.copyFileSync(bak, pricesPath);
+        return;
+      } catch (_) {
+        /* fall through */
+      }
+    }
     fs.writeFileSync(pricesPath, JSON.stringify(defaultPricesPayload(), null, 2), "utf8");
   }
 }
@@ -315,6 +325,9 @@ function getWebPricesPayload() {
 function writePrices(prices) {
   ensurePrices();
   atomicWriteJsonFile(pricesPath, prices);
+  if (discordClientRef) {
+    pushPricesBackupToDiscord(discordClientRef, "prices-change").catch(() => {});
+  }
 }
 
 function readPurchases() {
@@ -423,6 +436,8 @@ function logDatabaseStatus() {
 let discordClientRef = null;
 let keysBackupPushInFlight = false;
 let keysBackupPushQueued = false;
+let pricesBackupPushInFlight = false;
+let pricesBackupPushQueued = false;
 
 function buildKeysBackupPayload(reason = "change") {
   const db = JSON.parse(fs.readFileSync(dbPath, "utf8"));
@@ -476,6 +491,99 @@ async function restoreKeysFromDiscordChannel(clientInstance) {
   atomicWriteJsonFile(dbPath, { keys: backup.keys });
   console.log(`[backup-discord] Restored ${backup.keys.length} keys from Discord`);
   return true;
+}
+
+function buildPricesBackupPayload(reason = "change") {
+  const prices = readPrices();
+  return {
+    schema: PRICES_BACKUP_SCHEMA,
+    exportedAt: new Date().toISOString(),
+    reason,
+    prices
+  };
+}
+
+async function fetchLatestDiscordPricesBackup(clientInstance) {
+  if (!clientInstance?.isReady()) return null;
+  const channel = await clientInstance.channels.fetch(KEYS_BACKUP_CHANNEL_ID).catch(() => null);
+  if (!channel || !channel.isTextBased()) return null;
+
+  let lastId;
+  for (let page = 0; page < 30; page += 1) {
+    const opts = { limit: 100 };
+    if (lastId) opts.before = lastId;
+    const fetched = await channel.messages.fetch(opts);
+    if (!fetched.size) break;
+
+    const messages = [...fetched.values()].sort((a, b) => b.createdTimestamp - a.createdTimestamp);
+    for (const msg of messages) {
+      if (msg.author?.id !== clientInstance.user.id) continue;
+      const attachment = msg.attachments.find(
+        (a) => a.name && a.name.startsWith("prices-backup-") && a.name.endsWith(".json")
+      );
+      if (!attachment?.url) continue;
+      const res = await fetch(attachment.url);
+      if (!res.ok) continue;
+      const parsed = JSON.parse(await res.text());
+      if (parsed?.prices?.base && parsed?.prices?.web) {
+        return parsed;
+      }
+    }
+
+    lastId = fetched.last().id;
+    if (fetched.size < 100) break;
+  }
+  return null;
+}
+
+async function restorePricesFromDiscordChannel(clientInstance) {
+  const backup = await fetchLatestDiscordPricesBackup(clientInstance);
+  if (!backup?.prices) {
+    console.warn("[backup-discord] No prices backup found in Discord channel");
+    return false;
+  }
+  atomicWriteJsonFile(pricesPath, backup.prices);
+  console.log("[backup-discord] Restored prices from Discord");
+  return true;
+}
+
+async function pushPricesBackupToDiscord(clientInstance, reason = "change") {
+  if (!clientInstance?.isReady()) {
+    pricesBackupPushQueued = true;
+    return;
+  }
+  if (pricesBackupPushInFlight) {
+    pricesBackupPushQueued = true;
+    return;
+  }
+  pricesBackupPushInFlight = true;
+  try {
+    ensurePrices();
+    const payload = buildPricesBackupPayload(reason);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const fileName = `prices-backup-${stamp}.json`;
+    const attachment = new AttachmentBuilder(Buffer.from(JSON.stringify(payload, null, 2), "utf8"), {
+      name: fileName
+    });
+    const channel = await clientInstance.channels.fetch(KEYS_BACKUP_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      throw new Error("Backup channel not found or not text-based");
+    }
+    await channel.send({
+      content: `💰 Prices backup • \`${reason}\``,
+      files: [attachment]
+    });
+    console.log(`[backup-discord] Pushed prices backup (reason: ${reason})`);
+  } catch (error) {
+    console.error("[backup-discord] Prices push failed:", error.message);
+    logError("backup_discord_prices_push", error, { reason }).catch(() => {});
+  } finally {
+    pricesBackupPushInFlight = false;
+    if (pricesBackupPushQueued) {
+      pricesBackupPushQueued = false;
+      pushPricesBackupToDiscord(clientInstance, reason).catch(() => {});
+    }
+  }
 }
 
 async function pushKeysBackupToDiscord(clientInstance, reason = "change") {
@@ -532,7 +640,14 @@ function writeDb(db) {
 }
 
 function hasRequiredRole(member) {
-  return !!member?.roles?.cache?.has(REQUIRED_ROLE_ID);
+  if (!member) return false;
+  if (member.roles?.cache?.has) {
+    return member.roles.cache.has(REQUIRED_ROLE_ID);
+  }
+  if (Array.isArray(member.roles)) {
+    return member.roles.includes(REQUIRED_ROLE_ID);
+  }
+  return false;
 }
 
 function commandRequiresRole(command) {
@@ -993,6 +1108,12 @@ client.once("ready", async () => {
     console.error("[backup-discord] Restore on startup failed:", error.message);
     logError("backup_discord_restore", error).catch(() => {});
   }
+  try {
+    await restorePricesFromDiscordChannel(client);
+  } catch (error) {
+    console.error("[backup-discord] Prices restore on startup failed:", error.message);
+    logError("backup_discord_prices_restore", error).catch(() => {});
+  }
   logDatabaseStatus();
   if (!process.env.DISCORD_CLIENT_ID && client.application?.id) {
     process.env.DISCORD_CLIENT_ID = client.application.id;
@@ -1192,17 +1313,14 @@ if (TOKEN) {
 client.on("interactionCreate", async (interaction) => {
   try {
   if (interaction.isChatInputCommand()) {
+    await safeDefer(interaction, false);
+
     const slashCommand = interaction.commandName;
     const publicSlashCommands = new Set(["falcaohelp", "s"]);
     const requiresRole = !publicSlashCommands.has(slashCommand);
     if (requiresRole && !hasRequiredRole(interaction.member)) {
       await safeReply(interaction, { content: `Not authorized. You need role <@&${REQUIRED_ROLE_ID}>.` });
       return;
-    }
-
-    const slowCommands = new Set(["keylist", "compraseveryone"]);
-    if (slowCommands.has(slashCommand)) {
-      await safeDefer(interaction, false);
     }
 
     if (slashCommand === "falcaohelp") {
@@ -1259,7 +1377,7 @@ client.on("interactionCreate", async (interaction) => {
         new ButtonBuilder().setCustomId("ticket_open_bug").setLabel("Bug").setEmoji("🐞").setStyle(ButtonStyle.Danger)
       );
       await interaction.channel.send({ embeds: [panelEmbed], components: [row] });
-      await interaction.reply({ content: "Ticket panel sent." });
+      await safeReply(interaction, { content: "Ticket panel sent." });
       return;
     }
 
@@ -1275,7 +1393,7 @@ client.on("interactionCreate", async (interaction) => {
         .setTitle("FALCAO EXTERNAL • Price Table")
         .setDescription([...lines, "", `Para comprar --> ${BUY_CHANNEL_LINK}`].join("\n"));
       await interaction.channel.send({ embeds: [embed] });
-      await interaction.reply({ content: "Price table sent." });
+      await safeReply(interaction, { content: "Price table sent." });
       return;
     }
 
@@ -1285,7 +1403,7 @@ client.on("interactionCreate", async (interaction) => {
       const amount = interaction.options.getNumber("precio", true);
       pricesPayload.base[timeKey] = Number(amount.toFixed(2));
       writePrices(pricesPayload);
-      await interaction.reply({ content: `Price updated: \`${timeKey}\` -> **${pricesPayload.base[timeKey]}€**` });
+      await safeReply(interaction, { content: `Price updated: \`${timeKey}\` -> **${pricesPayload.base[timeKey]}€**` });
       return;
     }
 
@@ -1294,7 +1412,7 @@ client.on("interactionCreate", async (interaction) => {
       const durationText = interaction.options.getString("duracion", true);
       const durationMs = parseDurationToMs(durationText);
       if (!durationMs || discount <= 0 || discount >= 100) {
-        await interaction.reply({ content: "Invalid values. Example: /oferta descuento:20 duracion:7d" });
+        await safeReply(interaction, { content: "Invalid values. Example: /oferta descuento:20 duracion:7d" });
         return;
       }
       const pricesPayload = readPrices();
@@ -1309,7 +1427,7 @@ client.on("interactionCreate", async (interaction) => {
         .setImage(PANEL_LOGO_URL)
         .setDescription([`💸 **Disccount:** **${pricesPayload.offer.discountPercent}%**`, `⏳ **Time left:** <t:${endUnix}:R>`, "🚀 Take advantage of it now!"].join("\n"));
       await sendLogEmbed(client, OFFER_CHANNEL_ID, embed);
-      await interaction.reply({ content: "Offer published." });
+      await safeReply(interaction, { content: "Offer published." });
       return;
     }
 
@@ -1317,7 +1435,7 @@ client.on("interactionCreate", async (interaction) => {
       const pricesPayload = readPrices();
       pricesPayload.offer = { discountPercent: 0, durationText: "", endsAt: null, expiredNotified: true };
       writePrices(pricesPayload);
-      await interaction.reply({ content: "Offer disabled." });
+      await safeReply(interaction, { content: "Offer disabled." });
       return;
     }
 
@@ -1328,7 +1446,7 @@ client.on("interactionCreate", async (interaction) => {
       const amount = interaction.options.getNumber("precio", true);
       const name = interaction.options.getString("nombre");
       if (!Number.isFinite(amount) || amount < 0) {
-        await interaction.reply({ content: "Precio invalido." });
+        await safeReply(interaction, { content: "Precio invalido." });
         return;
       }
       pricesPayload.web = normalizeWebPrices(pricesPayload.web);
@@ -1336,7 +1454,7 @@ client.on("interactionCreate", async (interaction) => {
       if (name && name.trim()) pricesPayload.web[productId].name = name.trim();
       writePrices(pricesPayload);
       const p = pricesPayload.web[productId];
-      await interaction.reply({
+      await safeReply(interaction, {
         content: `Web actualizada: **${p.name}** · ${plan} = **${p[plan]}€**`
       });
       return;
@@ -1374,7 +1492,7 @@ client.on("interactionCreate", async (interaction) => {
 
     if (slashCommand === "s") {
       if (!SUGGESTION_CHANNEL_IDS.has(interaction.channelId)) {
-        await interaction.reply({ content: "This command only works in suggestion channels." });
+        await safeReply(interaction, { content: "This command only works in suggestion channels." });
         return;
       }
       const suggestionText = interaction.options.getString("mensaje", true);
@@ -1404,7 +1522,7 @@ client.on("interactionCreate", async (interaction) => {
         endsAt: endAt,
         closed: false
       });
-      await interaction.reply({ content: "Suggestion posted." });
+      await safeReply(interaction, { content: "Suggestion posted." });
       return;
     }
 
@@ -1535,7 +1653,6 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     if (slashCommand === "keybackups") {
-      await safeDefer(interaction, true);
       const db = readDb();
       const payload = {
         schema: "falcao-external-keys-backup-v1",
@@ -1554,7 +1671,6 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     if (slashCommand === "keyimports") {
-      await safeDefer(interaction, true);
       const file = interaction.options.getAttachment("archivo", true);
       if (!file?.url) {
         await safeReply(interaction, { content: "Missing file URL." });
@@ -1613,7 +1729,7 @@ client.on("interactionCreate", async (interaction) => {
       const before = db.keys.length;
       db.keys = db.keys.filter((k) => k.key !== key);
       writeDb(db);
-      await interaction.reply({ content: db.keys.length === before ? "Key not found." : `Deleted key: \`${key}\`` });
+      await safeReply(interaction, { content: db.keys.length === before ? "Key not found." : `Deleted key: \`${key}\`` });
       return;
     }
 
@@ -1622,14 +1738,14 @@ client.on("interactionCreate", async (interaction) => {
       const key = interaction.options.getString("key", true);
       const found = getKeyRecord(db, key);
       if (!found) {
-        await interaction.reply({ content: "Key not found." });
+        await safeReply(interaction, { content: "Key not found." });
         return;
       }
       found.hwid = null;
       found.ip = null;
       found.firstLoginAt = null;
       writeDb(db);
-      await interaction.reply({ content: `HWID/IP reset for \`${key}\`.` });
+      await safeReply(interaction, { content: `HWID/IP reset for \`${key}\`.` });
       return;
     }
     return;
