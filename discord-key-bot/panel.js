@@ -23,6 +23,7 @@ const panelSessions = new Map();
  * @property {number|null} webExpiresAt
  * @property {object|null} state
  * @property {Array<object>} commands
+ * @property {{ mime: string, data: string, width: number, height: number, at: number }|null} visualFrame
  */
 
 function createPanelToken() {
@@ -66,7 +67,8 @@ function ensureSession(keyNorm) {
       lastWebSeen: null,
       webExpiresAt: null,
       state: null,
-      commands: []
+      commands: [],
+      visualFrame: null
     };
     panelSessions.set(keyNorm, session);
   }
@@ -107,6 +109,23 @@ function queueCommands(session, commands) {
     session.commands = session.commands.slice(-PANEL_MAX_COMMANDS);
   }
   return slice.length;
+}
+
+function extractVisualFrame(session, state) {
+  if (!session || !state || typeof state !== "object") return;
+  const vm = state.meta && state.meta.visualMirror;
+  if (!vm || !vm.frame) {
+    if (vm && !vm.active) session.visualFrame = null;
+    return;
+  }
+  session.visualFrame = {
+    mime: vm.mime || "image/jpeg",
+    data: vm.frame,
+    width: vm.width || 0,
+    height: vm.height || 0,
+    at: Date.now()
+  };
+  delete vm.frame;
 }
 
 function cleanupPanelSessions() {
@@ -190,7 +209,9 @@ function mountPanelApi(app, deps) {
     session.hwid = hwid;
     session.lastClientSeen = Date.now();
     if (state && typeof state === "object") {
-      session.state = state;
+      const stateCopy = JSON.parse(JSON.stringify(state));
+      extractVisualFrame(session, stateCopy);
+      session.state = stateCopy;
     }
 
     const pending = session.commands.splice(0, PANEL_MAX_COMMANDS_PER_REQUEST);
@@ -268,8 +289,31 @@ function mountPanelApi(app, deps) {
       clientOnline: isClientOnline(session),
       lastClientSeen: session.lastClientSeen ? new Date(session.lastClientSeen).toISOString() : null,
       state: session.state,
-      keyMasked: maskLicenseKey(session.keyNorm)
+      keyMasked: maskLicenseKey(session.keyNorm),
+      visualMirrorActive: !!(session.state && session.state.meta && session.state.meta.visualMirror && session.state.meta.visualMirror.active)
     });
+  });
+
+  app.get("/api/panel/web/visual-frame", (req, res) => {
+    const webToken = String(req.headers["x-panel-web-token"] || req.query.token || "");
+    const session = getSessionByWebToken(webToken);
+    if (!session || !session.webExpiresAt || session.webExpiresAt < Date.now()) {
+      res.status(401).json({ ok: false, message: "Sesion web invalida o expirada." });
+      return;
+    }
+    session.lastWebSeen = Date.now();
+    session.webExpiresAt = Date.now() + PANEL_WEB_SLIDE_MS;
+    const frame = session.visualFrame;
+    if (!frame || !frame.data) {
+      res.status(204).end();
+      return;
+    }
+    const buf = Buffer.from(frame.data, "base64");
+    res.setHeader("Content-Type", frame.mime || "image/jpeg");
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+    res.setHeader("X-Frame-Width", String(frame.width || 0));
+    res.setHeader("X-Frame-Height", String(frame.height || 0));
+    res.send(buf);
   });
 
   app.post("/api/panel/web/command", (req, res) => {
