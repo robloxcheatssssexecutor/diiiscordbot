@@ -14,6 +14,7 @@ const {
 } = require("discord.js");
 
 const { mountPanelApi } = require("./panel");
+const { mountManageApi } = require("./manage");
 const TOKEN = process.env.DISCORD_TOKEN;
 const PREFIX = process.env.PREFIX || "!";
 const API_PORT = Number(process.env.PORT || process.env.API_PORT || 3000);
@@ -131,7 +132,8 @@ function restoreKeysFromLatestBackup() {
 }
 const BRAND_ORANGE = 0xff8a33;
 const BUTTON_COOLDOWN_MS = 2500;
-const PANEL_LOGO_URL = "https://i.imgur.com/Nuy61wA.png";
+const PANEL_LOGO_URL = "https://i.imgur.com/0nTvfnO.png";
+const FAVICON_URL = "https://i.imgur.com/lst2PVm.png";
 
 const PAYMENT_METHODS = [
   { id: "paypal", label: "Paypal", emoji: "💳" },
@@ -959,6 +961,18 @@ mountPanelApi(app, {
   getWebPricesPayload
 });
 
+mountManageApi(app, {
+  express,
+  normalizeKey,
+  getKeyRecord,
+  readDb,
+  writeDb,
+  getClientIp,
+  generateKey,
+  calcExpiresAt,
+  normalizePlan
+});
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers]
 });
@@ -979,6 +993,10 @@ client.once("ready", async () => {
       console.log(`HTTP API online on port ${API_PORT}`);
     });
     apiServerStarted = true;
+  }
+  if (!process.env.DISCORD_CLIENT_ID && client.application?.id) {
+    process.env.DISCORD_CLIENT_ID = client.application.id;
+    console.log(`[manage] DISCORD_CLIENT_ID auto: ${client.application.id}`);
   }
   console.log(`Bot online: ${client.user.tag}`);
   console.log(`[data] Data directory: ${dataDir}`);
