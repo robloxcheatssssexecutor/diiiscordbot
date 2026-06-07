@@ -5,9 +5,15 @@ services:
     plan: starter
     buildCommand: npm install
     startCommand: npm start
+    disk:
+      name: falcao-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: PERSISTENT_DATA_DIR
+        value: /var/data/falcao-external
       - key: KEYS_BACKUP_CHANNEL_ID
         value: "1511740812621250712"
       - key: DISCORD_TOKEN
