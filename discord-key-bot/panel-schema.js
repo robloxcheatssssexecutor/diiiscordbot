@@ -443,7 +443,6 @@ module.exports = {
             item("captbypss", "Stream Proof", "Stream Proof"),
             item("gpu_capt_bypass", "Stream Proof Nvidia/AMD", "GPU Stream Proof"),
             item("second_monitor", "Modo Segundo Monitor", "Second Monitor"),
-            item("hide_menu_unfocused", "Ocultar menu al cambiar de ventana", "Hide menu when unfocused"),
             item("mobile_control_only", "Solo control movil (ocultar menu PC)", "Mobile-only control (hide PC menu)"),
             item("thd_delay", "Retraso del Procesamiento", "Thread Delay", "int", { min: 0, max: 100 }),
             item("login_orange_particles", "Particulas login", "Login particles")
