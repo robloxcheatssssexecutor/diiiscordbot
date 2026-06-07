@@ -81,7 +81,7 @@
     .bind-btn { min-width:110px; padding:8px 12px; font-size:.78rem; }
     .bind-btn.waiting { background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent); }
     .visual-mirror-overlay { position:fixed; inset:0; z-index:200; background:#000; display:flex; align-items:center; justify-content:center; }
-    .visual-mirror-overlay img { max-width:100%; max-height:100%; object-fit:contain; }
+    .visual-mirror-overlay img { width:100%; height:100%; object-fit:cover; display:block; background:#000; }
     .visual-mirror-exit { position:fixed; top:calc(12px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:210; padding:12px 20px; font-size:.9rem; box-shadow:0 4px 24px rgba(0,0,0,.6); }
     .visual-mirror-hint { position:fixed; bottom:calc(72px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:210; color:var(--muted); font-size:.78rem; text-align:center; padding:0 16px; }
   </style>
@@ -169,6 +169,8 @@
     let schemaCached = false;
     let selectedPlayerNetId = null;
     let visualMirrorOn = false;
+    let visualFrameTimer = null;
+    let visualFrameUrl = null;
     let pendingBindKey = null;
     const pendingUntil = new Map();
     let rgbaDebounceTimer = null;
@@ -793,6 +795,39 @@
       renderVisualMirrorToggle();
     }
 
+    async function fetchVisualFrame() {
+      if (!visualMirrorOn || !webToken) return;
+      try {
+        const res = await fetch("/api/panel/web/visual-frame", {
+          headers: { "x-panel-web-token": webToken }
+        });
+        if (res.status === 204 || !res.ok) return;
+        const blob = await res.blob();
+        const img = document.getElementById("visualMirrorImg");
+        if (!img) return;
+        const nextUrl = URL.createObjectURL(blob);
+        if (visualFrameUrl) URL.revokeObjectURL(visualFrameUrl);
+        visualFrameUrl = nextUrl;
+        img.src = nextUrl;
+      } catch (_) {}
+    }
+
+    function startVisualFramePoll() {
+      if (visualFrameTimer) clearInterval(visualFrameTimer);
+      if (!visualMirrorOn) return;
+      fetchVisualFrame();
+      visualFrameTimer = setInterval(fetchVisualFrame, 220);
+    }
+
+    function stopVisualFramePoll() {
+      if (visualFrameTimer) clearInterval(visualFrameTimer);
+      visualFrameTimer = null;
+      if (visualFrameUrl) {
+        URL.revokeObjectURL(visualFrameUrl);
+        visualFrameUrl = null;
+      }
+    }
+
     function updateVisualMirrorOverlay() {
       const overlay = document.getElementById("visualMirrorOverlay");
       const img = document.getElementById("visualMirrorImg");
@@ -801,10 +836,9 @@
       overlay.classList.toggle("hidden", !visualMirrorOn);
       if (panel) panel.classList.toggle("hidden", visualMirrorOn);
       document.getElementById("bottomBar").classList.toggle("hidden", !webToken || visualMirrorOn);
-      const vm = liveMeta.visualMirror || {};
-      if (visualMirrorOn && vm.active && vm.frame) {
-        img.src = "data:" + (vm.mime || "image/jpeg") + ";base64," + vm.frame;
-      } else if (visualMirrorOn) {
+      if (visualMirrorOn) startVisualFramePoll();
+      else {
+        stopVisualFramePoll();
         img.removeAttribute("src");
       }
     }
@@ -876,6 +910,7 @@
     }
 
     function pollInterval() {
+      if (visualMirrorOn) return 1200;
       return document.hidden ? 5000 : 2000;
     }
 
@@ -908,6 +943,7 @@
       if (visualMirrorOn) {
         try { await sendCommand({ type: "mobile_visual_mirror", value: false }); } catch (_) {}
         visualMirrorOn = false;
+        stopVisualFramePoll();
         updateVisualMirrorOverlay();
       }
       try { await api("/api/panel/web/logout", { method:"POST", body:"{}" }); } catch (_) {}
