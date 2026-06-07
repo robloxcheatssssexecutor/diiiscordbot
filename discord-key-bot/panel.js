@@ -317,9 +317,25 @@ function mountPanelApi(app, deps) {
     res.json({ ok: true });
   });
 
-  app.use("/panel", deps.express.static(path.join(__dirname, "public", "panel")));
-  app.get("/panel", (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "panel", "index.html"));
+  const panelCandidates = [
+    path.join(__dirname, "panel", "index.html"),
+    path.join(__dirname, "public", "panel", "index.html")
+  ];
+
+  function resolvePanelHtmlPath() {
+    for (const candidate of panelCandidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  app.get(["/panel", "/panel/"], (_req, res) => {
+    const panelHtmlPath = resolvePanelHtmlPath();
+    if (!panelHtmlPath) {
+      res.status(503).type("text/plain").send("Panel remoto no disponible. Redespliega con panel/index.html.");
+      return;
+    }
+    res.sendFile(panelHtmlPath);
   });
 
   const showcaseCandidates = [
