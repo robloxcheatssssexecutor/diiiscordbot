@@ -72,6 +72,10 @@
 
     @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     @media(max-width:520px){.topbar{padding:0 16px}}
+    .topbar-nav-links{display:flex;align-items:center;gap:4px}
+    .topbar-nav-links a{text-decoration:none;color:var(--muted);font-size:.83rem;padding:6px 11px;border-radius:8px;transition:background .13s,color .13s}
+    .topbar-nav-links a:hover{background:rgba(255,255,255,.06);color:var(--text)}
+    .topbar-sep{width:1px;height:20px;background:var(--stroke);margin:0 4px}
   </style>
 </head>
 <body>
@@ -156,18 +160,48 @@ async function loadAuth(){
     const res=await fetch("/api/account/auth/status");
     const data=await res.json();
     if(data.authenticated){
-      el.innerHTML=`<a class="avatar-link" href="/account">
+      // Check admin status in parallel
+      let isAdmin=false;
+      try{
+        const mres=await fetch("/api/manage/auth/status");
+        const mdata=await mres.json();
+        isAdmin=!!mdata.authenticated;
+      }catch(_){}
+
+      const manageLink=isAdmin
+        ?`<span class="topbar-sep"></span><a href="/manage" style="color:var(--muted);font-size:.8rem">Manage</a>`
+        :"";
+      el.innerHTML=`<div class="topbar-nav-links">
+        <a href="/account">Mi Cuenta</a>
+        ${manageLink}
+      </div>
+      <a class="avatar-link" href="/account">
         <img src="${data.discordAvatar}" alt="avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
         ${data.discordUsername}
       </a>`;
     }else{
-      el.innerHTML=`<div class="auth-btns">
+      // Not authenticated: still check manage admin
+      let isAdmin=false;
+      try{
+        const mres=await fetch("/api/manage/auth/status");
+        const mdata=await mres.json();
+        isAdmin=!!mdata.authenticated;
+      }catch(_){}
+
+      const manageLink=isAdmin
+        ?`<span class="topbar-sep"></span><a href="/manage" style="color:var(--muted);font-size:.8rem">Manage</a>`
+        :"";
+      el.innerHTML=`<div class="topbar-nav-links">
+        <a href="/account">Mi Cuenta</a>
+        ${manageLink}
+      </div>
+      <div class="auth-btns">
         <a class="btn-login" href="/api/account/auth/login">Iniciar sesión</a>
         <a class="btn-register" href="/api/account/auth/login">Registrarse</a>
       </div>`;
     }
   }catch(_){
-    el.innerHTML=`<div class="auth-btns"><a class="btn-login" href="/api/account/auth/login">Login</a></div>`;
+    el.innerHTML=`<div class="topbar-nav-links"><a href="/account">Mi Cuenta</a></div><div class="auth-btns"><a class="btn-login" href="/api/account/auth/login">Login</a></div>`;
   }
 }
 
