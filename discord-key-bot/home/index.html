@@ -49,11 +49,15 @@
       padding: 28px 0 36px;
     }
     .logo {
-      width: 88px;
-      height: 88px;
-      border-radius: 18px;
-      box-shadow: 0 0 40px var(--glow);
-      margin-bottom: 16px;
+      width: min(160px, 42vw);
+      height: auto;
+      aspect-ratio: 1;
+      border-radius: 22px;
+      box-shadow: 0 0 48px var(--glow);
+      margin-bottom: 18px;
+      object-fit: contain;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
     }
     h1 {
       margin: 0;
@@ -160,14 +164,16 @@
   <canvas id="bgCanvas"></canvas>
   <div class="wrap">
     <header class="hero">
-      <img class="logo" src="https://i.imgur.com/0nTvfnO.png" alt="Falcao External" width="88" height="88" loading="eager" />
+      <img class="logo" src="https://i.imgur.com/0nTvfnO.png" alt="Falcao External" width="512" height="512" loading="eager" decoding="async" fetchpriority="high" />
       <h1>Falcao External</h1>
       <p class="sub">External para FiveM · Panel remoto desde el movil · Control total de tu cheat</p>
       <div class="actions">
         <a class="btn btn-primary" href="/panel">Panel remoto</a>
         <a class="btn btn-secondary" href="/showcase">Ver menu (showcase)</a>
         <a class="btn btn-discord" href="https://discord.gg/falcao" target="_blank" rel="noopener">Discord</a>
-        <a class="btn btn-secondary" href="/manage" style="opacity:.85">Manage</a>
+        <a class="btn btn-secondary" href="/account">Mi Cuenta</a>
+        <a class="btn btn-secondary" href="/claim">Reclamar Key</a>
+        <a class="btn btn-secondary" href="/manage" style="opacity:.75">Manage</a>
       </div>
       <div id="offerPill" class="offer-pill"></div>
     </header>
