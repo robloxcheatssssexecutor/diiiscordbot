@@ -1,273 +1,224 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Falcao External</title>
-  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png" />
-  <link rel="preconnect" href="https://i.imgur.com" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
-    :root {
-      --bg: #08080c;
-      --card: #121217;
-      --stroke: #2a2a35;
-      --text: #e8e8ee;
-      --muted: #8a8a9a;
-      --accent: #e85822;
-      --accent-dim: rgba(232, 88, 34, 0.16);
-      --glow: rgba(232, 88, 34, 0.35);
-    }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      overflow-x: hidden;
-    }
-    #bgCanvas {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      pointer-events: none;
-      opacity: 0.55;
-    }
-    .wrap {
-      position: relative;
-      z-index: 1;
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 32px 18px 48px;
-    }
-    .hero {
-      text-align: center;
-      padding: 28px 0 36px;
-    }
-    .logo {
-      width: min(160px, 42vw);
-      height: auto;
-      aspect-ratio: 1;
-      border-radius: 22px;
-      box-shadow: 0 0 48px var(--glow);
-      margin-bottom: 18px;
-      object-fit: contain;
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: crisp-edges;
-    }
-    h1 {
-      margin: 0;
-      font-size: clamp(1.8rem, 5vw, 2.4rem);
-      letter-spacing: -0.02em;
-    }
-    .sub {
-      margin: 10px auto 0;
-      max-width: 520px;
-      color: var(--muted);
-      line-height: 1.5;
-      font-size: 0.95rem;
-    }
-    .actions {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 24px;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 20px;
-      border-radius: 12px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
-    }
-    .btn:hover { transform: translateY(-2px); }
-    .btn-primary {
-      background: var(--accent);
-      color: #111;
-      box-shadow: 0 8px 28px var(--glow);
-    }
-    .btn-secondary {
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--stroke);
-    }
-    .btn-discord {
-      background: #5865f2;
-      color: #fff;
-    }
-    .section-title {
-      margin: 36px 0 14px;
-      font-size: 1.1rem;
-      color: var(--accent);
-      text-align: center;
-    }
-    .price-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-    }
-    .price-card {
-      background: linear-gradient(180deg, rgba(232,88,34,.08), transparent 40%), var(--card);
-      border: 1px solid var(--stroke);
-      border-radius: 16px;
-      padding: 18px;
-      animation: rise .5s ease both;
-    }
-    .price-card h3 {
-      margin: 0 0 12px;
-      font-size: 1.05rem;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
-    th, td {
-      padding: 10px 8px;
-      border-bottom: 1px solid rgba(255,255,255,.06);
-      text-align: left;
-    }
-    th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em; }
-    td:last-child, th:last-child { text-align: right; }
-    .offer-pill {
-      display: none;
-      margin: 16px auto 0;
-      width: fit-content;
-      padding: 8px 14px;
-      border-radius: 999px;
-      background: var(--accent-dim);
-      color: var(--accent);
-      font-size: 0.82rem;
-      font-weight: 600;
-    }
-    .footer {
-      margin-top: 40px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.8rem;
-    }
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    :root{--bg:#08080c;--card:#121217;--stroke:#2a2a35;--text:#e8e8ee;--muted:#8a8a9a;--accent:#e85822;--glow:rgba(232,88,34,.35);--accent-dim:rgba(232,88,34,.14)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100vh;font-family:"Instrument Sans",system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+    #bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.5}
+
+    /* ── TOPBAR ── */
+    .topbar{position:sticky;top:0;z-index:10;background:rgba(8,8,12,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--stroke);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px}
+    .topbar-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:700;font-size:1rem}
+    .topbar-logo img{width:32px;height:32px;border-radius:8px}
+    .topbar-nav{display:flex;align-items:center;gap:6px}
+    .topbar-nav a{text-decoration:none;color:var(--muted);font-size:.85rem;padding:7px 13px;border-radius:9px;transition:background .14s,color .14s;white-space:nowrap}
+    .topbar-nav a:hover{background:rgba(255,255,255,.06);color:var(--text)}
+    .topbar-right{display:flex;align-items:center;gap:10px}
+    /* Auth buttons when not logged in */
+    .auth-btns{display:flex;gap:8px}
+    .auth-btns a{text-decoration:none;font-size:.83rem;font-weight:600;padding:7px 14px;border-radius:9px;transition:opacity .14s,transform .12s;white-space:nowrap}
+    .auth-btns a:hover{opacity:.85;transform:translateY(-1px)}
+    .btn-login{background:rgba(88,101,242,.15);color:#7c8cf8;border:1px solid rgba(88,101,242,.3)}
+    .btn-register{background:#5865f2;color:#fff}
+    /* Avatar when logged in */
+    .avatar-link{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--text);font-size:.83rem;font-weight:600;padding:5px 10px 5px 5px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--stroke);transition:background .14s}
+    .avatar-link:hover{background:rgba(255,255,255,.08)}
+    .avatar-link img{width:30px;height:30px;border-radius:50%;object-fit:cover}
+
+    /* ── HERO ── */
+    .wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:0 20px 60px}
+    .hero{text-align:center;padding:64px 0 48px}
+    .hero-logo{width:min(140px,36vw);height:auto;aspect-ratio:1;border-radius:24px;box-shadow:0 0 60px var(--glow);margin-bottom:22px;object-fit:contain}
+    .hero h1{font-size:clamp(2rem,5vw,2.8rem);letter-spacing:-.03em;margin-bottom:10px}
+    .hero p{color:var(--muted);max-width:480px;margin:0 auto 30px;line-height:1.6;font-size:.95rem}
+
+    /* CTA buttons — two groups */
+    .cta-group{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+    .cta-secondary{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-weight:600;border-radius:12px;transition:transform .13s,box-shadow .13s,opacity .13s;white-space:nowrap;padding:12px 22px;font-size:.9rem}
+    .btn:hover{transform:translateY(-2px)}
+    .btn-primary{background:var(--accent);color:#111;box-shadow:0 8px 28px var(--glow)}
+    .btn-primary:hover{box-shadow:0 12px 36px var(--glow)}
+    .btn-discord{background:#5865f2;color:#fff}
+    .btn-outline{background:var(--card);color:var(--text);border:1px solid var(--stroke);font-size:.83rem;padding:9px 16px;border-radius:10px}
+    .btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+
+    /* ── FEATURES ── */
+    .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:48px 0}
+    .feat{background:linear-gradient(160deg,rgba(232,88,34,.06),transparent 60%),var(--card);border:1px solid var(--stroke);border-radius:16px;padding:20px 22px}
+    .feat-icon{font-size:1.6rem;margin-bottom:10px}
+    .feat h3{font-size:.95rem;margin-bottom:6px}
+    .feat p{font-size:.82rem;color:var(--muted);line-height:1.5}
+
+    /* ── PRICES ── */
+    .section-label{text-align:center;font-size:.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin:48px 0 16px;font-weight:600}
+    .section-title{text-align:center;font-size:1.5rem;font-weight:700;margin-bottom:24px}
+    .price-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+    .price-card{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:20px;animation:rise .4s ease both}
+    .price-card h3{font-size:1rem;font-weight:700;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;font-size:.88rem}
+    th,td{padding:9px 6px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}
+    th{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;font-weight:500}
+    td:last-child,th:last-child{text-align:right}
+    .offer-pill{display:none;margin:18px auto 0;width:fit-content;padding:7px 16px;border-radius:999px;background:var(--accent-dim);color:var(--accent);font-size:.8rem;font-weight:600}
+
+    /* ── FOOTER ── */
+    footer{margin-top:56px;text-align:center;color:var(--muted);font-size:.78rem;padding-bottom:20px}
+    footer a{color:var(--accent);text-decoration:none}
+
+    @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @media(max-width:520px){.topbar-nav{display:none}.topbar{padding:0 16px}}
   </style>
 </head>
 <body>
-  <canvas id="bgCanvas"></canvas>
-  <div class="wrap">
-    <header class="hero">
-      <img class="logo" src="https://i.imgur.com/0nTvfnO.png" alt="Falcao External" width="512" height="512" loading="eager" decoding="async" fetchpriority="high" />
-      <h1>Falcao External</h1>
-      <p class="sub">External para FiveM · Panel remoto desde el movil · Control total de tu cheat</p>
-      <div class="actions">
-        <a class="btn btn-primary" href="/panel">Panel remoto</a>
-        <a class="btn btn-secondary" href="/showcase">Ver menu (showcase)</a>
-        <a class="btn btn-discord" href="https://discord.gg/falcao" target="_blank" rel="noopener">Discord</a>
-        <a class="btn btn-secondary" href="/account">Mi Cuenta</a>
-        <a class="btn btn-secondary" href="/claim">Reclamar Key</a>
-        <a class="btn btn-secondary" href="/manage" style="opacity:.75">Manage</a>
-      </div>
-      <div id="offerPill" class="offer-pill"></div>
-    </header>
+<canvas id="bgCanvas"></canvas>
 
-    <h2 class="section-title">Precios</h2>
-    <div class="price-grid" id="priceGrid">
-      <div class="price-card"><h3>Cargando...</h3></div>
+<!-- TOPBAR -->
+<header class="topbar">
+  <a class="topbar-logo" href="/">
+    <img src="https://i.imgur.com/lst2PVm.png" alt="logo"/>
+    Falcao External
+  </a>
+  <nav class="topbar-nav">
+    <a href="/panel">Panel remoto</a>
+    <a href="/showcase">Showcase</a>
+    <a href="/claim">Reclamar key</a>
+  </nav>
+  <div class="topbar-right" id="topbarRight">
+    <!-- Filled by JS -->
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- HERO -->
+  <section class="hero">
+    <img class="hero-logo" src="https://i.imgur.com/lst2PVm.png" alt="Falcao External" width="512" height="512" fetchpriority="high"/>
+    <h1>Falcao External</h1>
+    <p>External para FiveM · Panel remoto desde el móvil · Control total de tu cheat</p>
+
+    <div class="cta-group">
+      <a class="btn btn-primary" href="/panel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Panel remoto
+      </a>
+      <a class="btn btn-discord" href="https://discord.gg/falcao" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+        Discord
+      </a>
     </div>
+    <div class="cta-secondary">
+      <a class="btn btn-outline" href="/showcase">Ver menú</a>
+      <a class="btn btn-outline" href="/claim">Reclamar key</a>
+    </div>
+    <div id="offerPill" class="offer-pill"></div>
+  </section>
 
-    <p class="footer">© Falcao External · <a href="https://discord.gg/falcao" style="color:var(--accent)">discord.gg/falcao</a></p>
+  <!-- FEATURES -->
+  <div class="features">
+    <div class="feat">
+      <div class="feat-icon">📱</div>
+      <h3>Panel desde el móvil</h3>
+      <p>Controla el cheat desde cualquier dispositivo con tu navegador. Sin instalaciones adicionales.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🔑</div>
+      <h3>Sistema de keys</h3>
+      <p>Activa tu licencia con tu cuenta de Discord. Reclama tu key y descarga el loader directamente.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">⚡</div>
+      <h3>Alto rendimiento</h3>
+      <p>ESP, aimbot, exploits y más — todo optimizado para funcionar sin afectar tu FPS.</p>
+    </div>
   </div>
 
-  <script>
-    (function constellation() {
-      const c = document.getElementById("bgCanvas");
-      const ctx = c.getContext("2d");
-      let w, h, pts;
-      function resize() {
-        w = c.width = window.innerWidth;
-        h = c.height = window.innerHeight;
-        const n = window.innerWidth < 600 ? 28 : 48;
-        pts = Array.from({ length: n }, () => ({
-          x: Math.random() * w, y: Math.random() * h,
-          vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35
-        }));
-      }
-      function tick() {
-        ctx.clearRect(0, 0, w, h);
-        for (const p of pts) {
-          p.x += p.vx; p.y += p.vy;
-          if (p.x < 0 || p.x > w) p.vx *= -1;
-          if (p.y < 0 || p.y > h) p.vy *= -1;
-        }
-        for (let i = 0; i < pts.length; i++) {
-          for (let j = i + 1; j < pts.length; j++) {
-            const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
-            const d = Math.hypot(dx, dy);
-            if (d < 140) {
-              ctx.strokeStyle = `rgba(232,88,34,${(1 - d / 140) * 0.22})`;
-              ctx.beginPath();
-              ctx.moveTo(pts[i].x, pts[i].y);
-              ctx.lineTo(pts[j].x, pts[j].y);
-              ctx.stroke();
-            }
-          }
-          ctx.fillStyle = "rgba(232,88,34,0.65)";
-          ctx.beginPath();
-          ctx.arc(pts[i].x, pts[i].y, 1.6, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        requestAnimationFrame(tick);
-      }
-      resize();
-      window.addEventListener("resize", resize);
-      tick();
-    })();
+  <!-- PRICES -->
+  <p class="section-label">Precios</p>
+  <h2 class="section-title">Elige tu plan</h2>
+  <div class="price-grid" id="priceGrid">
+    <div class="price-card"><h3>Cargando...</h3></div>
+  </div>
 
-    const PLAN_LABELS = { week: "Semana", monthly: "Mensual", lifetime: "Lifetime" };
+  <footer>
+    © Falcao External · <a href="https://discord.gg/falcao">discord.gg/falcao</a>
+  </footer>
+</div>
 
-    function fmtPrice(v) {
-      if (typeof v !== "number" || !Number.isFinite(v)) return "—";
-      return v.toFixed(2) + "€";
+<script>
+// ── Constellation bg ──────────────────────────────────────────────────────
+(function(){
+  const c=document.getElementById("bgCanvas"),ctx=c.getContext("2d");
+  let w,h,pts;
+  function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;pts=Array.from({length:window.innerWidth<600?28:46},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35}));}
+  function tick(){ctx.clearRect(0,0,w,h);for(const p of pts){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1;}for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);if(d<140){ctx.strokeStyle=`rgba(232,88,34,${(1-d/140)*.2})`;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();}}ctx.fillStyle="rgba(232,88,34,.6)";ctx.beginPath();ctx.arc(pts[i].x,pts[i].y,1.6,0,Math.PI*2);ctx.fill();}requestAnimationFrame(tick);}
+  resize();window.addEventListener("resize",resize);tick();
+})();
+
+// ── Auth state → topbar ───────────────────────────────────────────────────
+async function loadAuth(){
+  const el=document.getElementById("topbarRight");
+  try{
+    const res=await fetch("/api/account/auth/status");
+    const data=await res.json();
+    if(data.authenticated){
+      el.innerHTML=`<a class="avatar-link" href="/account">
+        <img src="${data.discordAvatar}" alt="avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
+        ${data.discordUsername}
+      </a>`;
+    }else{
+      el.innerHTML=`<div class="auth-btns">
+        <a class="btn-login" href="/api/account/auth/login">Iniciar sesión</a>
+        <a class="btn-register" href="/api/account/auth/login">Registrarse</a>
+      </div>`;
     }
+  }catch(_){
+    el.innerHTML=`<div class="auth-btns"><a class="btn-login" href="/api/account/auth/login">Login</a></div>`;
+  }
+}
 
-    async function loadPrices() {
-      const grid = document.getElementById("priceGrid");
-      try {
-        const res = await fetch("/api/web/prices");
-        const data = await res.json();
-        const products = data.products || {};
-        const ids = ["product1", "product2"];
-        grid.innerHTML = "";
-        ids.forEach((id, i) => {
-          const p = products[id] || {};
-          const card = document.createElement("div");
-          card.className = "price-card";
-          card.style.animationDelay = (i * 0.08) + "s";
-          card.innerHTML = `<h3>${p.name || id}</h3><table><thead><tr><th>Plan</th><th>Precio</th></tr></thead><tbody>
-            <tr><td>${PLAN_LABELS.week}</td><td>${fmtPrice(p.week)}</td></tr>
-            <tr><td>${PLAN_LABELS.monthly}</td><td>${fmtPrice(p.monthly)}</td></tr>
-            <tr><td>${PLAN_LABELS.lifetime}</td><td>${fmtPrice(p.lifetime)}</td></tr>
-          </tbody></table>`;
-          grid.appendChild(card);
-        });
-        const pill = document.getElementById("offerPill");
-        if (data.discountActive && data.discountPercent > 0) {
-          pill.style.display = "block";
-          pill.textContent = "Oferta activa: -" + data.discountPercent + "% en la web";
-        }
-      } catch (_) {
-        grid.innerHTML = '<div class="price-card"><h3>Precios no disponibles</h3></div>';
-      }
+// ── Prices ────────────────────────────────────────────────────────────────
+const PLAN_LABELS={week:"Semana",monthly:"Mensual",lifetime:"Lifetime"};
+function fmtPrice(v){if(typeof v!=="number"||!Number.isFinite(v))return "—";return v.toFixed(2)+"€";}
+
+async function loadPrices(){
+  const grid=document.getElementById("priceGrid");
+  try{
+    const res=await fetch("/api/web/prices");
+    const data=await res.json();
+    const products=data.products||{};
+    grid.innerHTML="";
+    Object.values(products).forEach((p,i)=>{
+      const card=document.createElement("div");
+      card.className="price-card";
+      card.style.animationDelay=(i*.08)+"s";
+      card.innerHTML=`<h3>${p.name||"Producto"}</h3><table>
+        <thead><tr><th>Plan</th><th>Precio</th></tr></thead>
+        <tbody>
+          <tr><td>${PLAN_LABELS.week}</td><td>${fmtPrice(p.week)}</td></tr>
+          <tr><td>${PLAN_LABELS.monthly}</td><td>${fmtPrice(p.monthly)}</td></tr>
+          <tr><td>${PLAN_LABELS.lifetime}</td><td>${fmtPrice(p.lifetime)}</td></tr>
+        </tbody></table>`;
+      grid.appendChild(card);
+    });
+    const pill=document.getElementById("offerPill");
+    if(data.discountActive&&data.discountPercent>0){
+      pill.style.display="block";
+      pill.textContent="🔥 Oferta activa: -"+data.discountPercent+"% en todos los planes";
     }
-    loadPrices();
-  </script>
+  }catch(_){
+    grid.innerHTML='<div class="price-card"><h3>Precios no disponibles</h3></div>';
+  }
+}
+
+loadAuth();
+loadPrices();
+</script>
 </body>
 </html>

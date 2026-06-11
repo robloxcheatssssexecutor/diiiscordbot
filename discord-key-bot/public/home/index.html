@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Falcao External</title>
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png" />
+  <link rel="preconnect" href="https://i.imgur.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #08080c;
+      --card: #121217;
+      --stroke: #2a2a35;
+      --text: #e8e8ee;
+      --muted: #8a8a9a;
+      --accent: #e85822;
+      --accent-dim: rgba(232, 88, 34, 0.16);
+      --glow: rgba(232, 88, 34, 0.35);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+    #bgCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.55;
+    }
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 18px 48px;
+    }
+    .hero {
+      text-align: center;
+      padding: 28px 0 36px;
+    }
+    .logo {
+      width: min(160px, 42vw);
+      height: auto;
+      aspect-ratio: 1;
+      border-radius: 22px;
+      box-shadow: 0 0 48px var(--glow);
+      margin-bottom: 18px;
+      object-fit: contain;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 5vw, 2.4rem);
+      letter-spacing: -0.02em;
+    }
+    .sub {
+      margin: 10px auto 0;
+      max-width: 520px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-primary {
+      background: var(--accent);
+      color: #111;
+      box-shadow: 0 8px 28px var(--glow);
+    }
+    .btn-secondary {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--stroke);
+    }
+    .btn-discord {
+      background: #5865f2;
+      color: #fff;
+    }
+    .section-title {
+      margin: 36px 0 14px;
+      font-size: 1.1rem;
+      color: var(--accent);
+      text-align: center;
+    }
+    .price-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .price-card {
+      background: linear-gradient(180deg, rgba(232,88,34,.08), transparent 40%), var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 18px;
+      animation: rise .5s ease both;
+    }
+    .price-card h3 {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      text-align: left;
+    }
+    th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em; }
+    td:last-child, th:last-child { text-align: right; }
+    .offer-pill {
+      display: none;
+      margin: 16px auto 0;
+      width: fit-content;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bgCanvas"></canvas>
+  <div class="wrap">
+    <header class="hero">
+      <img class="logo" src="https://i.imgur.com/0nTvfnO.png" alt="Falcao External" width="512" height="512" loading="eager" decoding="async" fetchpriority="high" />
+      <h1>Falcao External</h1>
+      <p class="sub">External para FiveM · Panel remoto desde el movil · Control total de tu cheat</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="/panel">Panel remoto</a>
+        <a class="btn btn-secondary" href="/showcase">Ver menu (showcase)</a>
+        <a class="btn btn-discord" href="https://discord.gg/falcao" target="_blank" rel="noopener">Discord</a>
+        <a class="btn btn-secondary" href="/manage" style="opacity:.85">Manage</a>
+      </div>
+      <div id="offerPill" class="offer-pill"></div>
+    </header>
+
+    <h2 class="section-title">Precios</h2>
+    <div class="price-grid" id="priceGrid">
+      <div class="price-card"><h3>Cargando...</h3></div>
+    </div>
+
+    <p class="footer">© Falcao External · <a href="https://discord.gg/falcao" style="color:var(--accent)">discord.gg/falcao</a></p>
+  </div>
+
+  <script>
+    (function constellation() {
+      const c = document.getElementById("bgCanvas");
+      const ctx = c.getContext("2d");
+      let w, h, pts;
+      function resize() {
+        w = c.width = window.innerWidth;
+        h = c.height = window.innerHeight;
+        const n = window.innerWidth < 600 ? 28 : 48;
+        pts = Array.from({ length: n }, () => ({
+          x: Math.random() * w, y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35
+        }));
+      }
+      function tick() {
+        ctx.clearRect(0, 0, w, h);
+        for (const p of pts) {
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < 0 || p.x > w) p.vx *= -1;
+          if (p.y < 0 || p.y > h) p.vy *= -1;
+        }
+        for (let i = 0; i < pts.length; i++) {
+          for (let j = i + 1; j < pts.length; j++) {
+            const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+            const d = Math.hypot(dx, dy);
+            if (d < 140) {
+              ctx.strokeStyle = `rgba(232,88,34,${(1 - d / 140) * 0.22})`;
+              ctx.beginPath();
+              ctx.moveTo(pts[i].x, pts[i].y);
+              ctx.lineTo(pts[j].x, pts[j].y);
+              ctx.stroke();
+            }
+          }
+          ctx.fillStyle = "rgba(232,88,34,0.65)";
+          ctx.beginPath();
+          ctx.arc(pts[i].x, pts[i].y, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        requestAnimationFrame(tick);
+      }
+      resize();
+      window.addEventListener("resize", resize);
+      tick();
+    })();
+
+    const PLAN_LABELS = { week: "Semana", monthly: "Mensual", lifetime: "Lifetime" };
+
+    function fmtPrice(v) {
+      if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+      return v.toFixed(2) + "€";
+    }
+
+    async function loadPrices() {
+      const grid = document.getElementById("priceGrid");
+      try {
+        const res = await fetch("/api/web/prices");
+        const data = await res.json();
+        const products = data.products || {};
+        const ids = ["product1", "product2"];
+        grid.innerHTML = "";
+        ids.forEach((id, i) => {
+          const p = products[id] || {};
+          const card = document.createElement("div");
+          card.className = "price-card";
+          card.style.animationDelay = (i * 0.08) + "s";
+          card.innerHTML = `<h3>${p.name || id}</h3><table><thead><tr><th>Plan</th><th>Precio</th></tr></thead><tbody>
+            <tr><td>${PLAN_LABELS.week}</td><td>${fmtPrice(p.week)}</td></tr>
+            <tr><td>${PLAN_LABELS.monthly}</td><td>${fmtPrice(p.monthly)}</td></tr>
+            <tr><td>${PLAN_LABELS.lifetime}</td><td>${fmtPrice(p.lifetime)}</td></tr>
+          </tbody></table>`;
+          grid.appendChild(card);
+        });
+        const pill = document.getElementById("offerPill");
+        if (data.discountActive && data.discountPercent > 0) {
+          pill.style.display = "block";
+          pill.textContent = "Oferta activa: -" + data.discountPercent + "% en la web";
+        }
+      } catch (_) {
+        grid.innerHTML = '<div class="price-card"><h3>Precios no disponibles</h3></div>';
+      }
+    }
+    loadPrices();
+  </script>
+</body>
+</html>

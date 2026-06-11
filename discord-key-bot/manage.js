@@ -271,8 +271,16 @@ function mountManageApi(app, deps) {
     if (!requireManageAuth(req, res)) return;
     const db = readDb();
     const q = String(req.query.q || "").trim().toUpperCase();
+    const filterStatus = String(req.query.status || "").trim().toLowerCase();
     let keys = [...db.keys];
-    if (q) keys = keys.filter((k) => normalizeKey(k.key).includes(q));
+    if (q) keys = keys.filter((k) =>
+      normalizeKey(k.key).includes(q) ||
+      (k.hwid && k.hwid.toUpperCase().includes(q)) ||
+      (k.ip && k.ip.includes(q)) ||
+      (k.claimedBy && k.claimedBy.includes(q)) ||
+      (k.claimedByUsername && k.claimedByUsername.toUpperCase().includes(q.toLowerCase ? q : q))
+    );
+    if (filterStatus) keys = keys.filter((k) => (k.status || "active") === filterStatus);
     keys.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(10, parseInt(req.query.limit, 10) || 50));
@@ -287,7 +295,10 @@ function mountManageApi(app, deps) {
       firstLoginAt: k.firstLoginAt || null,
       hwid: k.hwid || null,
       ip: k.ip || null,
-      note: k.note || null
+      note: k.note || null,
+      claimedBy: k.claimedBy || null,
+      claimedByUsername: k.claimedByUsername || null,
+      claimedAt: k.claimedAt || null
     }));
     res.json({ ok: true, total: keys.length, page, limit, keys: slice });
   });

@@ -15,6 +15,7 @@ const {
 
 const { mountPanelApi } = require("./panel");
 const { mountManageApi } = require("./manage");
+const { mountAccountApi } = require("./account");
 const TOKEN = process.env.DISCORD_TOKEN;
 const PREFIX = process.env.PREFIX || "!";
 const API_PORT = Number(process.env.PORT || process.env.API_PORT || 3000);
@@ -1092,6 +1093,17 @@ mountManageApi(app, {
   normalizePlan
 });
 
+const loadersPath = path.join(dataDir, "loaders");
+
+mountAccountApi(app, {
+  readDb,
+  writeDb,
+  getKeyRecord,
+  normalizeKey,
+  normalizePlan,
+  loadersPath
+});
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers]
 });
@@ -1224,6 +1236,18 @@ client.once("ready", async () => {
       .setDescription("Import keys from a JSON backup file.")
       .addAttachmentOption((o) =>
         o.setName("archivo").setDescription("JSON file from /keybackups").setRequired(true)
+      ),
+    new SlashCommandBuilder()
+      .setName("falcaoloader")
+      .setDescription("Update the Falcao plan loader file (replaces previous).")
+      .addAttachmentOption((o) =>
+        o.setName("archivo").setDescription("Loader executable file").setRequired(true)
+      ),
+    new SlashCommandBuilder()
+      .setName("temploader")
+      .setDescription("Update the Temp plan loader file (replaces previous).")
+      .addAttachmentOption((o) =>
+        o.setName("archivo").setDescription("Loader executable file").setRequired(true)
       )
   ].map((cmd) => cmd.toJSON());
 
@@ -1720,6 +1744,65 @@ client.on("interactionCreate", async (interaction) => {
 
       writeDb(db);
       await safeReply(interaction, { content: `Import done. Imported: **${imported}** | Skipped: **${skipped}** | Total now: **${db.keys.length}**` });
+      return;
+    }
+
+    if (slashCommand === "falcaoloader" || slashCommand === "temploader") {
+      const loaderType = slashCommand === "falcaoloader" ? "falcao" : "temp";
+      const file = interaction.options.getAttachment("archivo", true);
+      if (!file?.url) {
+        await safeReply(interaction, { content: "Falta el archivo." });
+        return;
+      }
+
+      try {
+        // Download the attachment
+        const res = await fetch(file.url);
+        if (!res.ok) {
+          await safeReply(interaction, { content: `No se pudo descargar el archivo (HTTP ${res.status}).` });
+          return;
+        }
+        const buf = Buffer.from(await res.arrayBuffer());
+
+        // Ensure loaders directory exists
+        const loadersDir = path.join(dataDir, "loaders");
+        fs.mkdirSync(loadersDir, { recursive: true });
+
+        // Load current meta, delete previous file if any
+        const metaPath = path.join(loadersDir, "loaders.json");
+        let meta = {};
+        if (fs.existsSync(metaPath)) {
+          try { meta = JSON.parse(fs.readFileSync(metaPath, "utf8")); } catch (_) {}
+        }
+        if (meta[loaderType]) {
+          const oldPath = path.join(loadersDir, meta[loaderType]);
+          if (fs.existsSync(oldPath)) {
+            try { fs.unlinkSync(oldPath); } catch (_) {}
+          }
+        }
+
+        // Save new file with original name
+        const safeFileName = file.name.replace(/[^a-zA-Z0-9._\-]/g, "_");
+        const newFilePath = path.join(loadersDir, safeFileName);
+        fs.writeFileSync(newFilePath, buf);
+
+        // Update meta
+        meta[loaderType] = safeFileName;
+        fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+
+        const planLabel = loaderType === "falcao" ? "Falcao" : "Temp";
+        await safeReply(interaction, {
+          content: `✅ Loader **${planLabel}** actualizado: \`${safeFileName}\` (${(buf.length / 1024).toFixed(1)} KB)\nLos usuarios con plan **${planLabel}** y **Both** pueden descargarlo desde /account.`
+        });
+        await logGeneral(client, `Loader ${planLabel} actualizado`, [
+          { name: "Archivo", value: safeFileName, inline: true },
+          { name: "Tamaño", value: `${(buf.length / 1024).toFixed(1)} KB`, inline: true },
+          { name: "Por", value: `<@${interaction.user.id}>`, inline: true }
+        ]);
+      } catch (err) {
+        console.error(`[loader] Error updating ${loaderType} loader:`, err.message);
+        await safeReply(interaction, { content: `Error al actualizar el loader: ${err.message}` });
+      }
       return;
     }
 
