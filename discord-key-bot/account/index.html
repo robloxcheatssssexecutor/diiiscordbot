@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mi Cuenta – Falcao External</title>
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png"/>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:#08080c; --card:#121217; --card2:#1a1a22; --stroke:#2a2a35;
+      --text:#e8e8ee; --muted:#8a8a9a; --accent:#e85822; --glow:rgba(232,88,34,.35);
+      --green:#22c55e; --red:#ef4444; --yellow:#eab308;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100vh;font-family:"Instrument Sans",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+    #bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.4}
+    .wrap{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:32px 18px 60px}
+
+    /* NAV */
+    nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28px;gap:12px;flex-wrap:wrap}
+    .logo-link{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:700;font-size:1.1rem}
+    .logo-link img{width:36px;height:36px;border-radius:8px}
+    .nav-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .nav-links a{text-decoration:none;color:var(--muted);font-size:.88rem;padding:6px 12px;border-radius:8px;transition:background .15s,color .15s}
+    .nav-links a:hover{background:var(--card2);color:var(--text)}
+    .nav-links a.active{color:var(--accent)}
+
+    /* USER CARD */
+    .user-card{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;margin-bottom:28px}
+    .user-card img{width:56px;height:56px;border-radius:50%;border:2px solid var(--stroke)}
+    .user-info h2{font-size:1.1rem;font-weight:700}
+    .user-info p{font-size:.82rem;color:var(--muted);margin-top:3px}
+    .user-actions{margin-left:auto;display:flex;gap:8px}
+
+    /* SECTIONS */
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .section-header h3{font-size:1rem;font-weight:600}
+    h2.section-title{font-size:1.05rem;font-weight:600;color:var(--accent);margin:32px 0 14px}
+
+    /* KEY CARDS */
+    .keys-grid{display:flex;flex-direction:column;gap:12px}
+    .key-card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:18px 20px}
+    .key-card .key-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .key-val{font-family:monospace;font-size:.88rem;background:var(--card2);padding:5px 10px;border-radius:8px;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:.75rem;font-weight:600;white-space:nowrap}
+    .badge-active{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+    .badge-expired{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+    .badge-paused{background:rgba(234,179,8,.15);color:var(--yellow);border:1px solid rgba(234,179,8,.3)}
+    .badge-plan{background:rgba(232,88,34,.12);color:var(--accent);border:1px solid rgba(232,88,34,.25)}
+    .key-meta{margin-top:10px;font-size:.8rem;color:var(--muted);display:flex;gap:20px;flex-wrap:wrap}
+    .key-meta span b{color:var(--text)}
+    .key-downloads{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+
+    /* BTNS */
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;transition:transform .12s,opacity .12s;text-decoration:none;border:none;font-family:inherit}
+    .btn:hover{transform:translateY(-1px);opacity:.9}
+    .btn-accent{background:var(--accent);color:#fff}
+    .btn-secondary{background:var(--card2);color:var(--text);border:1px solid var(--stroke)}
+    .btn-download{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+    .btn-danger{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+    .btn-sm{padding:6px 12px;font-size:.8rem}
+
+    /* LOGIN SCREEN */
+    .login-center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;gap:20px}
+    .login-center img{width:80px;height:80px;border-radius:18px;box-shadow:0 0 32px var(--glow)}
+    .login-center h1{font-size:1.8rem}
+    .login-center p{color:var(--muted);max-width:420px;line-height:1.6}
+    .discord-btn{background:#5865f2;color:#fff;padding:14px 28px;border-radius:12px;font-size:1rem;font-weight:700;display:inline-flex;align-items:center;gap:10px;text-decoration:none;transition:transform .15s,box-shadow .15s;box-shadow:0 8px 24px rgba(88,101,242,.4)}
+    .discord-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(88,101,242,.55)}
+
+    /* EMPTY */
+    .empty{text-align:center;padding:48px 20px;color:var(--muted)}
+    .empty p{margin-top:8px;font-size:.9rem}
+
+    /* TOAST */
+    #toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--stroke);border-radius:12px;padding:12px 18px;font-size:.88rem;z-index:999;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;pointer-events:none}
+    #toast.show{opacity:1;transform:translateY(0)}
+  </style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div class="wrap" id="app">
+  <!-- Rendered by JS -->
+</div>
+<div id="toast"></div>
+
+<script>
+const FAVICON = "https://i.imgur.com/lst2PVm.png";
+const PLAN_LABEL = { falcao: "Falcao", temp: "Temp", both: "Both" };
+
+// ── Constellation bg ──────────────────────────────────────────────────────
+(function(){
+  const c=document.getElementById("bgCanvas");
+  const ctx=c.getContext("2d");
+  let w,h,pts;
+  function resize(){
+    w=c.width=window.innerWidth; h=c.height=window.innerHeight;
+    pts=Array.from({length:36},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3}));
+  }
+  function tick(){
+    ctx.clearRect(0,0,w,h);
+    for(const p of pts){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1;}
+    for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){
+      const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);
+      if(d<130){ctx.strokeStyle=`rgba(232,88,34,${(1-d/130)*.18})`;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();}
+    }
+    ctx.fillStyle="rgba(232,88,34,.55)";ctx.beginPath();ctx.arc(pts[i].x,pts[i].y,1.5,0,Math.PI*2);ctx.fill();}
+    requestAnimationFrame(tick);
+  }
+  resize();window.addEventListener("resize",resize);tick();
+})();
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function toast(msg,ok=true){
+  const el=document.getElementById("toast");
+  el.textContent=msg;
+  el.style.borderColor=ok?"rgba(34,197,94,.4)":"rgba(239,68,68,.4)";
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove("show"),3000);
+}
+
+// ── API ───────────────────────────────────────────────────────────────────
+async function api(url,opts={}){
+  const res=await fetch(url,{headers:{"Content-Type":"application/json"},...opts});
+  return res.json();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function statusBadge(status){
+  const cls={active:"badge-active",expired:"badge-expired",paused:"badge-paused"}[status]||"badge-paused";
+  const dot={active:"🟢",expired:"🔴",paused:"🟡"}[status]||"⚪";
+  return `<span class="badge ${cls}">${dot} ${status}</span>`;
+}
+function fmtDate(iso){
+  if(!iso)return "—";
+  return new Date(iso).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric"});
+}
+function daysLeft(iso){
+  if(!iso)return null;
+  const diff=new Date(iso).getTime()-Date.now();
+  if(diff<=0)return 0;
+  return Math.ceil(diff/86400000);
+}
+function copyToClipboard(text){
+  navigator.clipboard.writeText(text).then(()=>toast("Copiado al portapapeles")).catch(()=>toast("No se pudo copiar",false));
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+const app=document.getElementById("app");
+
+function renderNav(user){
+  return `
+  <nav>
+    <a class="logo-link" href="/"><img src="${FAVICON}" alt="logo"/>Falcao External</a>
+    <div class="nav-links">
+      <a href="/">Inicio</a>
+      <a href="/panel">Panel</a>
+      <a href="/claim">Reclamar Key</a>
+      <a href="/account" class="active">Mi Cuenta</a>
+    </div>
+  </nav>`;
+}
+
+function renderLoginScreen(){
+  app.innerHTML=`
+  ${renderNav(null)}
+  <div class="login-center">
+    <img src="${FAVICON}" alt="logo"/>
+    <h1>Mi Cuenta</h1>
+    <p>Inicia sesión con Discord para ver tus keys, descargar loaders y gestionar tu cuenta.</p>
+    <a class="discord-btn" href="/api/account/auth/login">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+      Continuar con Discord
+    </a>
+  </div>`;
+}
+
+function renderKeyCard(k){
+  const days=daysLeft(k.expiresAt);
+  const daysHtml=days===null?"<span>Lifetime</span>"
+    :days===0?`<span style="color:var(--red)">Expirada</span>`
+    :`<span>${days} días restantes</span>`;
+
+  const loaderBtns=(k.canDownload && k.loaders&&k.loaders.length>0)
+    ? k.loaders.map(l=>`<a class="btn btn-download btn-sm" href="/api/account/download/${l}" download>⬇ Loader ${PLAN_LABEL[l]||l}</a>`).join("")
+    : (k.status!=="active"?`<span style="font-size:.8rem;color:var(--muted)">Key ${k.status} — descarga no disponible</span>`
+       :`<span style="font-size:.8rem;color:var(--muted)">Loader no disponible aún</span>`);
+
+  return `
+  <div class="key-card">
+    <div class="key-row">
+      <span class="key-val" title="${k.key}">${k.key}</span>
+      <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${k.key}')">📋</button>
+      ${statusBadge(k.status)}
+      <span class="badge badge-plan">${PLAN_LABEL[k.plan]||k.plan}</span>
+    </div>
+    <div class="key-meta">
+      <span>Expira: <b>${fmtDate(k.expiresAt)}</b></span>
+      <span>${daysHtml}</span>
+      ${k.firstLoginAt?`<span>Primer uso: <b>${fmtDate(k.firstLoginAt)}</b></span>`:""}
+    </div>
+    <div class="key-downloads">${loaderBtns}</div>
+  </div>`;
+}
+
+async function renderAccount(user){
+  const keysData=await api("/api/account/keys");
+  const keys=keysData.keys||[];
+
+  const keysHtml=keys.length===0
+    ?`<div class="empty"><span style="font-size:2rem">🔑</span><p>No tienes ninguna key reclamada.<br><a href="/claim" style="color:var(--accent)">Reclamar una key</a></p></div>`
+    :keys.map(renderKeyCard).join("");
+
+  app.innerHTML=`
+  ${renderNav(user)}
+  <div class="user-card">
+    <img src="${user.discordAvatar}" alt="avatar"/>
+    <div class="user-info">
+      <h2>${user.discordUsername}</h2>
+      <p>Discord ID: ${user.discordId}</p>
+    </div>
+    <div class="user-actions">
+      <a href="/claim" class="btn btn-accent btn-sm">+ Reclamar key</a>
+      <button class="btn btn-secondary btn-sm" id="logoutBtn">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <h2 class="section-title">🔑 Mis Keys</h2>
+  <div class="keys-grid">${keysHtml}</div>`;
+
+  document.getElementById("logoutBtn")?.addEventListener("click",async()=>{
+    await api("/api/account/auth/logout",{method:"POST"});
+    window.location.reload();
+  });
+}
+
+async function init(){
+  const status=await api("/api/account/auth/status");
+  if(!status.authenticated){
+    renderLoginScreen();
+    return;
+  }
+  await renderAccount(status);
+}
+
+init();
+</script>
+</body>
+</html>
