@@ -211,8 +211,19 @@ function mountManageApi(app, deps) {
       res.status(400).send("Parametros OAuth invalidos.");
       return;
     }
-    const stateExpires = oauthStates.get(state);
-    oauthStates.delete(state);
+
+    // Account OAuth reuses this callback — detect by "account:" prefix in state
+    const isAccountFlow = state.startsWith("account:");
+    const rawState = isAccountFlow ? state.slice(8) : state;
+
+    if (isAccountFlow) {
+      // Delegate to account module's state store
+      const { handleAccountOAuthCallback } = require("./account");
+      return handleAccountOAuthCallback(req, res, code, rawState);
+    }
+
+    const stateExpires = oauthStates.get(rawState);
+    oauthStates.delete(rawState);
     if (!stateExpires || stateExpires < Date.now()) {
       res.status(400).send("State expirado. Vuelve a intentar.");
       return;

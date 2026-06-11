@@ -123,18 +123,22 @@ function mountAccountApi(app, deps) {
     }
     const state = createToken();
     accountOauthStates.set(state, Date.now() + OAUTH_STATE_TTL_MS);
-    const redirectUri = `${getBaseUrl(req)}/api/account/auth/callback`;
+    // Reuse the same redirect URI as /manage/auth/callback — it's already registered in Discord.
+    // We distinguish account vs manage via the ?type=account query param embedded in state.
+    const redirectUri = `${getBaseUrl(req)}/api/manage/auth/callback`;
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
       response_type: "code",
       scope: "identify",
-      state
+      state: "account:" + state
     });
     res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
   });
 
   app.get("/api/account/auth/callback", async (req, res) => {
+    // This handler is here as fallback if the account redirect_uri is ever registered separately.
+    // Normally the callback goes through /api/manage/auth/callback (see account login above).
     const { code, state } = req.query || {};
     const clientId = process.env.DISCORD_CLIENT_ID;
     const clientSecret = process.env.DISCORD_CLIENT_SECRET;
@@ -142,8 +146,9 @@ function mountAccountApi(app, deps) {
       res.status(400).send("Parámetros OAuth inválidos.");
       return;
     }
-    const stateExp = accountOauthStates.get(state);
-    accountOauthStates.delete(state);
+    const rawState = state.startsWith("account:") ? state.slice(8) : state;
+    const stateExp = accountOauthStates.get(rawState);
+    accountOauthStates.delete(rawState);
     if (!stateExp || stateExp < Date.now()) {
       res.status(400).send("State expirado. Vuelve a intentar.");
       return;
@@ -174,7 +179,6 @@ function mountAccountApi(app, deps) {
         res.status(403).send("No se pudo leer tu usuario de Discord.");
         return;
       }
-
       const sessionToken = createToken();
       accountSessions.set(sessionToken, {
         discordId: String(user.id),
@@ -394,9 +398,63 @@ function getAvailableLoaders(plan, loadersPath) {
   return out;
 }
 
+// ── Exported OAuth handler (called from manage.js callback when state starts with "account:") ──
+async function handleAccountOAuthCallback(req, res, code, rawState) {
+  const stateExp = accountOauthStates.get(rawState);
+  accountOauthStates.delete(rawState);
+  if (!stateExp || stateExp < Date.now()) {
+    res.status(400).send("State expirado. Vuelve a intentar.");
+    return;
+  }
+  const clientId = process.env.DISCORD_CLIENT_ID;
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+  try {
+    const redirectUri = `${getBaseUrl(req)}/api/manage/auth/callback`;
+    const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri
+      })
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenRes.ok || !tokenData.access_token) {
+      res.status(403).send("No se pudo autenticar con Discord.");
+      return;
+    }
+    const userRes = await fetch("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    const user = await userRes.json();
+    if (!userRes.ok || !user.id) {
+      res.status(403).send("No se pudo leer tu usuario de Discord.");
+      return;
+    }
+    const sessionToken = createToken();
+    accountSessions.set(sessionToken, {
+      discordId: String(user.id),
+      discordUsername: user.username || user.global_name || "Unknown",
+      discordAvatar: user.avatar
+        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+        : `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(user.id) >> 22n) % 6}.png`,
+      expiresAt: Date.now() + ACCOUNT_SESSION_TTL_MS
+    });
+    setAccountCookie(res, sessionToken, req);
+    res.redirect("/account");
+  } catch (err) {
+    console.error("[account] OAuth callback error:", err.message);
+    res.status(500).send("Error interno de autenticación.");
+  }
+}
+
 module.exports = {
   mountAccountApi,
   getLoadersMeta,
   saveLoadersMeta,
-  getLoaderPath
+  getLoaderPath,
+  handleAccountOAuthCallback
 };
