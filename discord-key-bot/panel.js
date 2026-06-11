@@ -420,7 +420,6 @@ function mountPanelApi(app, deps) {
     path.join(__dirname, "home", "index.html"),
     path.join(__dirname, "public", "home", "index.html")
   ];
-  let homeHtmlCached = null;
 
   function resolveHomeHtmlPath() {
     for (const candidate of homeCandidates) {
@@ -430,10 +429,10 @@ function mountPanelApi(app, deps) {
   }
 
   function getHomeHtml() {
-    if (homeHtmlCached) return homeHtmlCached;
+    // No cache — always read fresh so deploys pick up changes immediately
     const homeHtmlPath = resolveHomeHtmlPath();
     if (!homeHtmlPath) throw new Error("home index.html not found in deploy");
-    return (homeHtmlCached = fs.readFileSync(homeHtmlPath, "utf8"));
+    return fs.readFileSync(homeHtmlPath, "utf8");
   }
 
   app.get("/", (_req, res) => {
