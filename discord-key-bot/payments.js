@@ -309,11 +309,11 @@ function flattenForStripe(obj, prefix = "") {
 // ── Mount payments API ─────────────────────────────────────────────────────
 function mountPaymentsApi(app, deps) {
   const { readDb, writeDb, generateKey, getKeyRecord, calcExpiresAt, normalizePlan,
-          appendKeyLog, dataDir, getWebPricesPayload, getDiscordClient() } = deps;
+          appendKeyLog, dataDir, getWebPricesPayload } = deps;
 
   ordersPath = path.join(dataDir, "orders.json");
   loadOrders();
-  startLtcPoller({ readDb, writeDb, generateKey, getKeyRecord, calcExpiresAt, normalizePlan, appendKeyLog, dataDir, getDiscordClient() });
+  startLtcPoller({ readDb, writeDb, generateKey, getKeyRecord, calcExpiresAt, normalizePlan, appendKeyLog, dataDir });
 
   const deliverDeps = { readDb, writeDb, generateKey, getKeyRecord, calcExpiresAt, normalizePlan, appendKeyLog, dataDir };
 
