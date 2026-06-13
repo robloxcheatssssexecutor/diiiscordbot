@@ -16,6 +16,8 @@ const {
 const { mountPanelApi } = require("./panel");
 const { mountManageApi } = require("./manage");
 const { mountAccountApi } = require("./account");
+const { appendKeyLog, mountKeyLogsApi } = require("./key-logs");
+const { mountPaymentsApi, pendingOrders } = require("./payments");
 const TOKEN = process.env.DISCORD_TOKEN;
 const PREFIX = process.env.PREFIX || "!";
 const API_PORT = Number(process.env.PORT || process.env.API_PORT || 3000);
@@ -825,7 +827,7 @@ function getKeyRecord(db, key) {
   return db.keys.find((k) => normalizeKey(k.key) === normalized);
 }
 
-function validateAndBindKey(db, key, hwid, ip, product) {
+function validateAndBindKey(db, key, hwid, ip, product, logDataDir) {
   const found = getKeyRecord(db, key);
   if (!found) {
     return { ok: false, message: "Key no existe." };
@@ -849,16 +851,18 @@ function validateAndBindKey(db, key, hwid, ip, product) {
     found.firstLoginAt = new Date().toISOString();
     found.hwid = hwid;
     found.ip = ip;
-    // Normalize stored key for consistent future comparisons.
     found.key = normalizeKey(found.key);
     writeDb(db);
+    appendKeyLog(dataDir, normalizeKey(found.key), "first_login", { ip, hwid, product: product || "falcao" });
     return { ok: true, message: "Primer login registrado. Key vinculada a HWID/IP.", key: found };
   }
 
   if (found.hwid !== hwid || found.ip !== ip) {
+    appendKeyLog(dataDir, normalizeKey(found.key), "login_rejected", { ip, hwid, reason: "hwid_ip_mismatch" });
     return { ok: false, message: "Acceso denegado: esta key ya esta vinculada a otro HWID/IP." };
   }
 
+  appendKeyLog(dataDir, normalizeKey(found.key), "login", { ip, hwid, product: product || "falcao" });
   return { ok: true, message: "Key valida para este HWID/IP.", key: found };
 }
 
@@ -942,7 +946,7 @@ app.post("/api/v1/licenses/activate", (req, res) => {
   }
 
   const db = readDb();
-  const result = validateAndBindKey(db, licenseKey, hwid, ip, product);
+  const result = validateAndBindKey(db, licenseKey, hwid, ip, product, dataDir);
   if (!result.ok) {
     res.status(403).json({ success: false, message: result.message });
     return;
@@ -1051,7 +1055,7 @@ app.post("/api/license/validate", (req, res) => {
 
   const db = readDb();
   const selectedProduct = product || plan || "";
-  const result = validateAndBindKey(db, key, hwid, ip, selectedProduct);
+  const result = validateAndBindKey(db, key, hwid, ip, selectedProduct, dataDir);
   if (!result.ok) {
     res.status(403).json(result);
     return;
@@ -1090,7 +1094,8 @@ mountManageApi(app, {
   getClientIp,
   generateKey,
   calcExpiresAt,
-  normalizePlan
+  normalizePlan,
+  dataDir
 });
 
 const loadersPath = path.join(dataDir, "loaders");
@@ -1104,10 +1109,35 @@ mountAccountApi(app, {
   loadersPath
 });
 
+// Raw body needed for Stripe webhook signature verification
+app.use("/api/payments/stripe/webhook", (req, _res, next) => {
+  let data = "";
+  req.setEncoding("utf8");
+  req.on("data", chunk => { data += chunk; });
+  req.on("end", () => { req.rawBody = data; next(); });
+});
+
+mountPaymentsApi(app, {
+  readDb,
+  writeDb,
+  generateKey,
+  getKeyRecord,
+  calcExpiresAt,
+  normalizePlan,
+  appendKeyLog,
+  dataDir,
+  getWebPricesPayload,
+  discordClient: null // will be set after client is ready
+});
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers]
 });
 discordClientRef = client;
+
+// Inject discord client into payments module after it's created
+const { setPaymentsDiscordClient } = require("./payments");
+setPaymentsDiscordClient(client);
 
 app.listen(API_PORT, "0.0.0.0", () => {
   console.log(`HTTP API online on port ${API_PORT} (bind 0.0.0.0)`);
@@ -1835,6 +1865,40 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   if (!interaction.isButton()) return;
+
+  // ── PayPal admin confirm/reject buttons ────────────────────────────────
+  if (interaction.customId.startsWith("paypal_confirm:") || interaction.customId.startsWith("paypal_reject:")) {
+    if (!hasRequiredRole(interaction.member)) {
+      await interaction.reply({ content: "No tienes permisos para esto.", ephemeral: true });
+      return;
+    }
+    const [action, orderId] = interaction.customId.split(":");
+    const isConfirm = action === "paypal_confirm";
+    try {
+      const res = await fetch(`http://localhost:${API_PORT}/api/payments/admin/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-secret": process.env.MENU_API_TOKEN || "" },
+        body: JSON.stringify({ orderId, action: isConfirm ? "confirm" : "reject" })
+      });
+      const data = await res.json();
+      if (isConfirm && data.ok) {
+        await interaction.update({
+          content: `✅ **Pago PayPal confirmado.** Key entregada: \`${data.key}\`\nOrder: \`${orderId}\``,
+          components: []
+        });
+      } else if (!isConfirm && data.ok) {
+        await interaction.update({
+          content: `❌ **Pago PayPal rechazado.** Order: \`${orderId}\``,
+          components: []
+        });
+      } else {
+        await interaction.reply({ content: `Error: ${data.message || "Orden no encontrada."}`, ephemeral: true });
+      }
+    } catch (err) {
+      await interaction.reply({ content: `Error interno: ${err.message}`, ephemeral: true });
+    }
+    return;
+  }
 
   if (interaction.customId.startsWith("copy_")) {
     const token = interaction.customId.replace("copy_", "");

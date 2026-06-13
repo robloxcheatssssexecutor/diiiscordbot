@@ -315,12 +315,44 @@ function openModal(k){
       </button>
       <button class="btn secondary" onclick="editNote('${k.key}','${(k.note||"").replace(/'/g,"\\'")}')">Nota</button>
       <button class="btn danger" onclick="deleteKey('${k.key}')">Borrar key</button>
+    </div>
+    <div style="margin-top:18px">
+      <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">📋 Logs de actividad</div>
+      <div id="keyLogsContainer" style="background:#0d1017;border:1px solid var(--stroke);border-radius:10px;padding:10px;max-height:220px;overflow-y:auto;font-size:.75rem;font-family:Consolas,monospace">
+        <span style="color:var(--muted)">Cargando logs...</span>
+      </div>
     </div>`;
   $("modalBg").classList.remove("hidden");
+  loadKeyLogs(k.key);
 }
 
 $("modalClose").onclick=()=>$("modalBg").classList.add("hidden");
 $("modalBg").onclick=(e)=>{if(e.target===$("modalBg"))$("modalBg").classList.add("hidden");};
+
+async function loadKeyLogs(key){
+  const ct=document.getElementById("keyLogsContainer");
+  if(!ct)return;
+  ct.innerHTML='<span style="color:var(--muted)">Cargando...</span>';
+  try{
+    const d=await api(`/api/manage/keys/${encodeURIComponent(key)}/logs`);
+    const logs=d.logs||[];
+    if(!logs.length){ct.innerHTML='<span style="color:var(--muted)">Sin logs registrados.</span>';return;}
+    const EVENT_ICONS={
+      first_login:"🟢",login:"✅",login_rejected:"❌",claimed:"🔑",
+      created:"✨",deleted:"🗑️",hwid_reset:"🔄",time_added:"⏫",
+      time_removed:"⏬",status_changed:"🔀",note_updated:"📝",
+      payment_delivered:"💳"
+    };
+    ct.innerHTML=logs.map(l=>{
+      const icon=EVENT_ICONS[l.event]||"📌";
+      const ts=new Date(l.ts).toLocaleString("es-ES",{dateStyle:"short",timeStyle:"short"});
+      const meta=Object.entries(l).filter(([k])=>!["ts","event"].includes(k)).map(([k,v])=>`<span style="color:var(--muted)">${k}:</span> <span style="color:#eef">${String(v).slice(0,60)}</span>`).join(" · ");
+      return `<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span style="color:var(--accent)">${ts}</span> ${icon} <b>${l.event}</b>${meta?" · "+meta:""}
+      </div>`;
+    }).join("");
+  }catch(_){ct.innerHTML='<span style="color:var(--err)">Error al cargar logs.</span>';}
+}
 
 async function modTime(key,mode){
   const label=mode==="add"?"Añadir tiempo (ej: 7d, 2w, 30 días):":"Quitar tiempo (ej: 7d):";

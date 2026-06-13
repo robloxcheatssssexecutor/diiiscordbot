@@ -189,7 +189,7 @@ function mountAccountApi(app, deps) {
         expiresAt: Date.now() + ACCOUNT_SESSION_TTL_MS
       });
       setAccountCookie(res, sessionToken, req);
-      res.redirect("/account");
+      res.redirect("/?tab=account");
     } catch (err) {
       console.error("[account] OAuth error:", err.message);
       res.status(500).send("Error interno de autenticación.");
@@ -342,24 +342,14 @@ function mountAccountApi(app, deps) {
     res.sendFile(path.resolve(loaderFile));
   });
 
-  // ── HTML page ─────────────────────────────────────────────────────────────
-  // Serve inline so the page works even if the deploy doesn't include the file
-  const accountHtmlPath = path.join(__dirname, "account", "index.html");
-  const claimHtmlPath = path.join(__dirname, "claim", "index.html");
-
-  function readPageOrFallback(filePath, fallbackText) {
-    try {
-      if (fs.existsSync(filePath)) return fs.readFileSync(filePath, "utf8");
-    } catch (_) {}
-    return `<!DOCTYPE html><html><body style="background:#08080c;color:#eee;font-family:sans-serif;padding:40px"><h2>${fallbackText}</h2><p>Archivo no encontrado en el deploy. Contacta al admin.</p></body></html>`;
-  }
-
   app.get(["/account", "/account/"], (_req, res) => {
-    res.type("html").send(readPageOrFallback(accountHtmlPath, "Mi Cuenta"));
+    // Redirect to the SPA with the account tab active
+    res.redirect("/?tab=account");
   });
 
   app.get(["/claim", "/claim/"], (_req, res) => {
-    res.type("html").send(readPageOrFallback(claimHtmlPath, "Reclamar Key"));
+    // Redirect to the SPA with the claim tab active
+    res.redirect("/?tab=claim");
   });
 }
 
@@ -444,7 +434,7 @@ async function handleAccountOAuthCallback(req, res, code, rawState) {
       expiresAt: Date.now() + ACCOUNT_SESSION_TTL_MS
     });
     setAccountCookie(res, sessionToken, req);
-    res.redirect("/account");
+    res.redirect("/?tab=account");
   } catch (err) {
     console.error("[account] OAuth callback error:", err.message);
     res.status(500).send("Error interno de autenticación.");

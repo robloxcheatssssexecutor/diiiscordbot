@@ -158,6 +158,9 @@ function mountManageApi(app, deps) {
     normalizePlan
   } = deps;
 
+  const { appendKeyLog, readKeyLogs } = require("./key-logs");
+  const logsDataDir = deps.dataDir;
+
   setInterval(cleanupManageSessions, 60 * 1000).unref();
 
   app.get(["/manage", "/manage/"], (_req, res) => {
@@ -278,6 +281,14 @@ function mountManageApi(app, deps) {
     res.json({ ok: true });
   });
 
+  // ── Key logs endpoint ─────────────────────────────────────────────────────
+  app.get("/api/manage/keys/:key/logs", (req, res) => {
+    if (!requireManageAuth(req, res)) return;
+    const keyNorm = normalizeKey(req.params.key);
+    const logs = logsDataDir ? readKeyLogs(logsDataDir, keyNorm) : [];
+    res.json({ ok: true, key: keyNorm, logs });
+  });
+
   app.get("/api/manage/keys", (req, res) => {
     if (!requireManageAuth(req, res)) return;
     const db = readDb();
@@ -316,6 +327,7 @@ function mountManageApi(app, deps) {
 
   app.post("/api/manage/keys", (req, res) => {
     if (!requireManageAuth(req, res)) return;
+    const sess = requireManageAuth(req, res); // session already checked above
     const { days, plan } = req.body || {};
     const durationDays = Math.max(1, parseInt(days, 10) || 30);
     const normalizedPlan = normalizePlan(plan) || "falcao";
@@ -336,6 +348,7 @@ function mountManageApi(app, deps) {
     };
     db.keys.push(record);
     writeDb(db);
+    if (logsDataDir) appendKeyLog(logsDataDir, normalizeKey(key), "created", { plan: normalizedPlan, durationDays });
     res.json({ ok: true, key: record });
   });
 
@@ -344,6 +357,7 @@ function mountManageApi(app, deps) {
     const target = normalizeKey(req.params.key);
     const db = readDb();
     const before = db.keys.length;
+    if (logsDataDir) appendKeyLog(logsDataDir, target, "deleted", {});
     db.keys = db.keys.filter((k) => normalizeKey(k.key) !== target);
     if (db.keys.length === before) {
       res.status(404).json({ ok: false, message: "Key no encontrada." });
@@ -358,20 +372,15 @@ function mountManageApi(app, deps) {
     const target = normalizeKey(req.params.key);
     const db = readDb();
     const found = getKeyRecord(db, target);
-    if (!found) {
-      res.status(404).json({ ok: false, message: "Key no encontrada." });
-      return;
-    }
+    if (!found) { res.status(404).json({ ok: false, message: "Key no encontrada." }); return; }
     const ms = parseDurationInput(req.body?.duration) || (parseInt(req.body?.days, 10) || 0) * 24 * 60 * 60 * 1000;
-    if (!ms || ms <= 0) {
-      res.status(400).json({ ok: false, message: "Duracion invalida (ej: 7d, 2w, 30)." });
-      return;
-    }
+    if (!ms || ms <= 0) { res.status(400).json({ ok: false, message: "Duracion invalida (ej: 7d, 2w, 30)." }); return; }
     const base = found.expiresAt ? new Date(found.expiresAt).getTime() : Date.now();
     const next = Math.max(Date.now(), base) + ms;
     found.expiresAt = new Date(next).toISOString();
     if (found.status === "expired") found.status = "active";
     writeDb(db);
+    if (logsDataDir) appendKeyLog(logsDataDir, target, "time_added", { duration: req.body?.duration, newExpiresAt: found.expiresAt });
     res.json({ ok: true, expiresAt: found.expiresAt });
   });
 
@@ -380,23 +389,15 @@ function mountManageApi(app, deps) {
     const target = normalizeKey(req.params.key);
     const db = readDb();
     const found = getKeyRecord(db, target);
-    if (!found) {
-      res.status(404).json({ ok: false, message: "Key no encontrada." });
-      return;
-    }
+    if (!found) { res.status(404).json({ ok: false, message: "Key no encontrada." }); return; }
     const ms = parseDurationInput(req.body?.duration) || (parseInt(req.body?.days, 10) || 0) * 24 * 60 * 60 * 1000;
-    if (!ms || ms <= 0) {
-      res.status(400).json({ ok: false, message: "Duracion invalida." });
-      return;
-    }
-    if (!found.expiresAt) {
-      res.status(400).json({ ok: false, message: "Key sin fecha de expiracion." });
-      return;
-    }
+    if (!ms || ms <= 0) { res.status(400).json({ ok: false, message: "Duracion invalida." }); return; }
+    if (!found.expiresAt) { res.status(400).json({ ok: false, message: "Key sin fecha de expiracion." }); return; }
     const next = new Date(found.expiresAt).getTime() - ms;
     found.expiresAt = new Date(Math.max(Date.now(), next)).toISOString();
     if (new Date(found.expiresAt).getTime() <= Date.now()) found.status = "expired";
     writeDb(db);
+    if (logsDataDir) appendKeyLog(logsDataDir, target, "time_removed", { duration: req.body?.duration, newExpiresAt: found.expiresAt });
     res.json({ ok: true, expiresAt: found.expiresAt, status: found.status });
   });
 
@@ -405,14 +406,14 @@ function mountManageApi(app, deps) {
     const target = normalizeKey(req.params.key);
     const db = readDb();
     const found = getKeyRecord(db, target);
-    if (!found) {
-      res.status(404).json({ ok: false, message: "Key no encontrada." });
-      return;
-    }
+    if (!found) { res.status(404).json({ ok: false, message: "Key no encontrada." }); return; }
+    const oldHwid = found.hwid;
+    const oldIp = found.ip;
     found.hwid = null;
     found.ip = null;
     found.firstLoginAt = null;
     writeDb(db);
+    if (logsDataDir) appendKeyLog(logsDataDir, target, "hwid_reset", { prevHwid: oldHwid, prevIp: oldIp });
     res.json({ ok: true });
   });
 
@@ -421,18 +422,15 @@ function mountManageApi(app, deps) {
     const target = normalizeKey(req.params.key);
     const db = readDb();
     const found = getKeyRecord(db, target);
-    if (!found) {
-      res.status(404).json({ ok: false, message: "Key no encontrada." });
-      return;
-    }
+    if (!found) { res.status(404).json({ ok: false, message: "Key no encontrada." }); return; }
     const { status, note, plan } = req.body || {};
+    const prevStatus = found.status;
     if (status && ["active", "expired", "paused"].includes(status)) found.status = status;
     if (note !== undefined) found.note = String(note || "").slice(0, 200) || null;
-    if (plan) {
-      const p = normalizePlan(plan);
-      if (p) found.plan = p;
-    }
+    if (plan) { const p = normalizePlan(plan); if (p) found.plan = p; }
     writeDb(db);
+    if (logsDataDir && status && status !== prevStatus) appendKeyLog(logsDataDir, target, "status_changed", { from: prevStatus, to: found.status });
+    if (logsDataDir && note !== undefined) appendKeyLog(logsDataDir, target, "note_updated", { note: found.note });
     res.json({ ok: true, key: found });
   });
 }
