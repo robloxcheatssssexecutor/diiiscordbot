@@ -1269,11 +1269,11 @@ client.once("ready", async () => {
       .setDescription("Activa oferta web con precio tachado y banner.")
       .addStringOption(o => o.setName("porcentaje").setDescription("Ej: -30 (descuento) o +10 (aumento)").setRequired(true))
       .addStringOption(o => o.setName("duracion").setDescription("Duración: 1h, 5d, 2w...").setRequired(true))
-      .addStringOption(o => o.setName("mensaje").setDescription("Mensaje personalizado (opcional)").setRequired(false))
       .addStringOption(o => o.setName("anunciar").setDescription("Anunciar en canal de ofertas?").setRequired(true)
         .addChoices({ name: "Si", value: "si" }, { name: "No", value: "no" }))
       .addStringOption(o => o.setName("everyone").setDescription("Mencionar @everyone?").setRequired(true)
-        .addChoices({ name: "Si", value: "si" }, { name: "No", value: "no" })),
+        .addChoices({ name: "Si", value: "si" }, { name: "No", value: "no" }))
+      .addStringOption(o => o.setName("mensaje").setDescription("Mensaje personalizado (opcional)").setRequired(false)),
     new SlashCommandBuilder()
       .setName("paypalconfirm")
       .setDescription("Confirmar o rechazar un pago PayPal pendiente.")
