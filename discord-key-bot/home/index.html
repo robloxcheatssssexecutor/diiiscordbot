@@ -265,20 +265,19 @@ function nav(id){
 async function loadAuth(){
   const tr=document.getElementById("topbarRight");
   try{
-    const[statusRes,manageRes]=await Promise.all([
-      fetch("/api/account/auth/status"),
-      fetch("/api/manage/auth/status")
-    ]);
-    const status=await statusRes.json();
-    const manage=await manageRes.json();
-    const isAdmin=manage.authenticated===true;
+    const status=await fetch("/api/account/auth/status").then(r=>r.json());
+    const manageTab=document.getElementById("manageTab");
+
     if(status.authenticated){
       currentUser=status;
       document.getElementById("claimTab").style.display="flex";
-      // Show manage tab only for admins
-      const manageTab = document.getElementById("manageTab");
-      if(manageTab) manageTab.style.display = manage.authenticated ? "flex" : "none";
-      // Topbar right: just avatar, no duplicate "Mi Cuenta" link
+      // Check if this Discord ID is admin — uses the new lightweight endpoint
+      let isAdmin=false;
+      try{
+        const ar=await fetch(`/api/manage/is-admin?discordId=${encodeURIComponent(status.discordId)}`).then(r=>r.json());
+        isAdmin=ar.isAdmin===true;
+      }catch(_){}
+      if(manageTab) manageTab.style.display=isAdmin?"flex":"none";
       tr.innerHTML=`
         <a class="avatar-link" href="#" onclick="nav('account');return false">
           <img src="${status.discordAvatar}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
@@ -287,8 +286,7 @@ async function loadAuth(){
     }else{
       currentUser=null;
       document.getElementById("claimTab").style.display="none";
-      const manageTab = document.getElementById("manageTab");
-      if(manageTab) manageTab.style.display = "none";
+      if(manageTab) manageTab.style.display="none";
       tr.innerHTML=`
         <div class="auth-btns">
           <a class="btn-login" href="/api/account/auth/login">Iniciar sesión</a>
