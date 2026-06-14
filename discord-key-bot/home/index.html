@@ -408,24 +408,25 @@ document.getElementById("keyInput")?.addEventListener("keydown",e=>{if(e.key==="
 
 // ── Shop ──────────────────────────────────────────────────────────────
 let shopPrices = null;
-let shopSelection = { plan: null, dur: null, method: null };
+let shopSel = { plan: null, dur: null, method: null };
 let activeOrder = null;
 let orderPollTimer = null;
 
-const DUR_LABELS = { week: "1 Semana", monthly: "1 Mes", lifetime: "Lifetime" };
-const METHOD_ICONS = { stripe: "💳", ltc: "🪙", paypal: "🐦" };
-const METHOD_NAMES = { stripe: "Tarjeta (Stripe)", ltc: "Litecoin", paypal: "PayPal F&F" };
+const DUR_LABELS = { week:"1 Semana", monthly:"1 Mes", lifetime:"Lifetime" };
+const METHOD_ICONS = { stripe:"💳", ltc:"🪙", paypal:"🐦" };
+const METHOD_NAMES = { stripe:"Tarjeta (Stripe)", ltc:"Litecoin", paypal:"PayPal F&F" };
+const METHOD_BADGES = { stripe:"Automático", ltc:"Automático", paypal:"Manual" };
 
 async function loadShopContent() {
   const ct = document.getElementById("shopContent");
   if (!ct) return;
-  ct.innerHTML = `<div class="shop-wrap"><p style="color:var(--muted)">Cargando precios...</p></div>`;
+  ct.innerHTML = `<div class="shop-wrap"><p style="color:var(--muted);padding:20px 0">Cargando precios...</p></div>`;
   try {
     const d = await fetch("/api/payments/prices").then(r => r.json());
     shopPrices = d;
     renderShop();
   } catch (_) {
-    ct.innerHTML = `<div class="shop-wrap"><p style="color:var(--red)">Error cargando tienda.</p></div>`;
+    ct.innerHTML = `<div class="shop-wrap"><p style="color:var(--red);padding:20px 0">Error cargando la tienda.</p></div>`;
   }
 }
 
@@ -433,115 +434,128 @@ function renderShop() {
   const ct = document.getElementById("shopContent");
   if (!ct || !shopPrices) return;
   const products = shopPrices.products || {};
-  const productIds = Object.keys(products);
 
-  const productCards = productIds.map(id => {
-    const p = products[id];
-    const durs = ["week", "monthly", "lifetime"].map(dk => {
+  let productHtml = "";
+  for (const [id, p] of Object.entries(products)) {
+    const durs = ["week","monthly","lifetime"].map(dk => {
       const price = p[dk];
-      const sel = shopSelection.plan === id && shopSelection.dur === dk;
-      return `<div class="dur-btn ${sel ? "selected" : ""}" onclick="selectDur('${id}','${dk}')">
+      const sel = shopSel.plan === id && shopSel.dur === dk;
+      const priceStr = typeof price === "number" ? price.toFixed(2)+"€" : "—";
+      return `<div class="dur-btn${sel?" selected":""}" data-plan="${id}" data-dur="${dk}">
         <span>${DUR_LABELS[dk]}</span>
-        <span class="dur-price">${typeof price === "number" ? price.toFixed(2) + "€" : "—"}</span>
+        <span class="dur-price">${priceStr}</span>
       </div>`;
     }).join("");
-    const planSel = shopSelection.plan === id;
-    return `<div class="shop-card ${planSel ? "selected" : ""}" onclick="selectPlan('${id}')">
+    const planSel = shopSel.plan === id;
+    productHtml += `<div class="shop-card${planSel?" selected":""}" data-plan="${id}">
       <h3>${p.name || id}</h3>
       <div class="shop-dur-grid">${durs}</div>
     </div>`;
-  }).join("");
+  }
 
-  const methodBtns = ["stripe", "ltc", "paypal"].map(m =>
-    `<div class="pay-btn ${shopSelection.method === m ? "selected" : ""}" onclick="selectMethod('${m}')">
+  const methodHtml = ["stripe","ltc","paypal"].map(m => {
+    const sel = shopSel.method === m;
+    return `<div class="pay-btn${sel?" selected":""}" data-method="${m}">
       <span class="pay-icon">${METHOD_ICONS[m]}</span>
       <span>${METHOD_NAMES[m]}</span>
-      <span class="pay-label">${m === "paypal" ? "Manual" : "Auto"}</span>
-    </div>`
-  ).join("");
+      <span class="pay-label">${METHOD_BADGES[m]}</span>
+    </div>`;
+  }).join("");
 
-  const canCheckout = shopSelection.plan && shopSelection.dur && shopSelection.method;
+  const canGo = shopSel.plan && shopSel.dur && shopSel.method;
+  const btnLabel = canGo
+    ? `Pagar ${getPriceForSelection()}€ con ${METHOD_NAMES[shopSel.method]} →`
+    : "Selecciona plan, duración y método";
 
   ct.innerHTML = `<div class="shop-wrap">
     <h2 class="shop-title">🛒 Comprar Key</h2>
-    <p class="shop-sub">Selecciona plan, duración y método de pago. Recibirás tu key automáticamente.</p>
-    <div class="shop-products">${productCards}</div>
-    <p style="font-size:.83rem;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Método de pago</p>
-    <div class="pay-methods">${methodBtns}</div>
-    <button class="btn btn-accent btn-full" style="max-width:320px" ${canCheckout ? "" : "disabled"} onclick="startCheckout()">
-      ${canCheckout ? "Continuar con el pago →" : "Selecciona plan y método"}
-    </button>
-    <div id="shopOrderBox"></div>
+    <p class="shop-sub">Elige tu plan, duración y forma de pago. Recibirás tu key automáticamente.</p>
+    <div class="shop-products" id="shopProducts">${productHtml}</div>
+    <p style="font-size:.82rem;font-weight:600;color:var(--muted);margin:18px 0 10px;text-transform:uppercase;letter-spacing:.06em">Método de pago</p>
+    <div class="pay-methods" id="payMethods">${methodHtml}</div>
+    <button class="btn btn-accent btn-full" style="max-width:340px;margin-top:6px" id="shopCheckoutBtn" ${canGo?"":"disabled"} onclick="startCheckout()">${btnLabel}</button>
+    <div id="shopOrderBox" style="margin-top:18px"></div>
   </div>`;
+
+  // Attach click handlers
+  ct.querySelectorAll(".shop-card").forEach(el => {
+    el.addEventListener("click", () => { shopSel.plan = el.dataset.plan; shopSel.dur = null; renderShop(); });
+  });
+  ct.querySelectorAll(".dur-btn").forEach(el => {
+    el.addEventListener("click", (e) => { e.stopPropagation(); shopSel.plan = el.dataset.plan; shopSel.dur = el.dataset.dur; renderShop(); });
+  });
+  ct.querySelectorAll(".pay-btn").forEach(el => {
+    el.addEventListener("click", () => { shopSel.method = el.dataset.method; renderShop(); });
+  });
 }
 
-function selectPlan(id) { shopSelection.plan = id; shopSelection.dur = null; renderShop(); }
-function selectDur(id, dk) { shopSelection.plan = id; shopSelection.dur = dk; renderShop(); }
-function selectMethod(m) { shopSelection.method = m; renderShop(); }
+function getPriceForSelection() {
+  if (!shopPrices || !shopSel.plan || !shopSel.dur) return "?";
+  const p = (shopPrices.products || {})[shopSel.plan];
+  if (!p) return "?";
+  const price = p[shopSel.dur];
+  return typeof price === "number" ? price.toFixed(2) : "?";
+}
 
 async function startCheckout() {
-  if (!shopSelection.plan || !shopSelection.dur || !shopSelection.method) return;
+  if (!shopSel.plan || !shopSel.dur || !shopSel.method) return;
   if (!currentUser) {
     document.getElementById("shopOrderBox").innerHTML =
-      `<div class="msg err" style="display:block;margin-top:14px">Debes iniciar sesión con Discord primero. <a href="/api/account/auth/login" style="color:var(--accent)">Login →</a></div>`;
+      `<div class="msg err" style="display:block">Debes iniciar sesión primero. <a href="/api/account/auth/login" style="color:var(--accent)">Login →</a></div>`;
     return;
   }
   const box = document.getElementById("shopOrderBox");
-  box.innerHTML = `<div class="shop-order-box"><div class="order-status"><div class="spinner"></div> Creando orden...</div></div>`;
+  box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem"><div class="spinner"></div> Creando orden...</div>`;
   try {
     const d = await fetch("/api/payments/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        method: shopSelection.method,
-        plan: shopSelection.plan,
-        durationKey: shopSelection.dur,
+        method: shopSel.method,
+        plan: shopSel.plan,
+        durationKey: shopSel.dur,
         discordId: currentUser.discordId,
         discordUsername: currentUser.discordUsername
       })
     }).then(r => r.json());
-
-    if (!d.ok) { box.innerHTML = `<div class="msg err" style="display:block;margin-top:14px">${d.message}</div>`; return; }
+    if (!d.ok) { box.innerHTML = `<div class="msg err" style="display:block">${d.message}</div>`; return; }
     activeOrder = d;
 
     if (d.method === "stripe") {
       box.innerHTML = `<div class="shop-order-box"><h3>💳 Pago con Stripe</h3>
-        <p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Serás redirigido a Stripe para pagar de forma segura.</p>
-        <a class="btn btn-accent btn-full" href="${d.stripeUrl}" style="max-width:280px">Pagar ${d.priceEur}€ con Stripe →</a></div>`;
-
+        <p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Serás redirigido a Stripe Checkout.</p>
+        <a class="btn btn-accent" href="${d.stripeUrl}" target="_blank">Pagar ${d.priceEur}€ →</a></div>`;
     } else if (d.method === "ltc") {
       box.innerHTML = `<div class="shop-order-box"><h3>🪙 Pago con Litecoin</h3>
         <div class="order-info">
-          Envía exactamente <b>${d.ltcAmount} LTC</b> a esta dirección:<br>
+          Envía exactamente <b>${d.ltcAmount} LTC</b> a:<br>
           <div class="ltc-addr">${d.ltcAddress}</div>
           Precio: <b>${d.priceEur}€</b> · Order: <b>${d.orderId}</b><br>
           Expira: <b>${new Date(d.expiresAt).toLocaleTimeString("es-ES")}</b>
         </div>
-        <div class="order-status" id="ltcStatus"><div class="spinner"></div> Esperando confirmación en blockchain...</div>
-        <p style="font-size:.75rem;color:var(--muted);margin-top:8px">La confirmación es automática (~1 bloque LTC). Recibirás tu key por Discord.</p>
+        <div class="order-status" id="ltcStatus"><div class="spinner"></div> Esperando en blockchain...</div>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:8px">Confirmación automática (~1 bloque). Recibirás tu key por Discord DM.</p>
       </div>`;
       pollOrder(d.orderId);
-
     } else if (d.method === "paypal") {
       box.innerHTML = `<div class="shop-order-box"><h3>🐦 Pago con PayPal F&F</h3>
         <div class="order-info">
-          Envía <b>${d.priceEur}€</b> como <b>Amigos y Familiares</b> a:<br>
+          Envía <b>${d.priceEur}€</b> como Amigos y Familiares a:<br>
           <div class="ltc-addr">${d.paypalEmail}</div>
-          Referencia: <b>${d.reference}</b><br>
-          <small style="color:var(--muted)">Incluye el Order ID como nota del pago.</small>
+          Incluye este Order ID en la nota: <b>${d.reference}</b>
         </div>
-        <button class="btn btn-accent btn-full" style="max-width:280px;margin-top:4px" onclick="notifyPayPal('${d.orderId}')">Ya he pagado — Notificar al admin</button>
+        <button class="btn btn-accent" style="max-width:280px;margin-top:4px" onclick="notifyPayPal('${d.orderId}')">Ya pagué — Notificar al admin</button>
         <div id="paypalStatus" style="margin-top:10px"></div>
       </div>`;
     }
   } catch (e) {
-    box.innerHTML = `<div class="msg err" style="display:block;margin-top:14px">Error: ${e.message}</div>`;
+    box.innerHTML = `<div class="msg err" style="display:block">Error: ${e.message}</div>`;
   }
 }
 
 async function notifyPayPal(orderId) {
   const st = document.getElementById("paypalStatus");
-  st.innerHTML = `<div class="order-status"><div class="spinner"></div> Enviando notificación...</div>`;
+  st.innerHTML = `<div class="order-status"><div class="spinner"></div> Enviando...</div>`;
   try {
     const d = await fetch("/api/payments/paypal/notify", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -550,9 +564,7 @@ async function notifyPayPal(orderId) {
     st.innerHTML = d.ok
       ? `<div style="color:var(--green);font-size:.85rem">✅ ${d.message}</div>`
       : `<div style="color:var(--red);font-size:.85rem">❌ ${d.message}</div>`;
-  } catch (_) {
-    st.innerHTML = `<div style="color:var(--red);font-size:.85rem">Error de red.</div>`;
-  }
+  } catch (_) { st.innerHTML = `<div style="color:var(--red)">Error de red.</div>`; }
 }
 
 function pollOrder(orderId) {
@@ -562,8 +574,8 @@ function pollOrder(orderId) {
       const d = await fetch(`/api/payments/order/${orderId}`).then(r => r.json());
       if (d.status === "delivered") {
         clearInterval(orderPollTimer);
-        document.getElementById("ltcStatus").innerHTML =
-          `<div style="color:var(--green);font-weight:600">✅ Pago confirmado. Key entregada por Discord DM.</div>`;
+        const el = document.getElementById("ltcStatus");
+        if (el) el.innerHTML = `<div style="color:var(--green);font-weight:600">✅ Pago confirmado. Key enviada por Discord DM.</div>`;
       }
     } catch (_) {}
   }, 15000);

@@ -550,6 +550,74 @@ async function restorePricesFromDiscordChannel(clientInstance) {
   return true;
 }
 
+async function restoreLoadersFromDiscord(clientInstance) {
+  if (!clientInstance?.isReady()) return false;
+  const channel = await clientInstance.channels.fetch(KEYS_BACKUP_CHANNEL_ID).catch(() => null);
+  if (!channel || !channel.isTextBased()) return false;
+
+  const loadersDir = path.join(dataDir, "loaders");
+  const metaPath = path.join(loadersDir, "loaders.json");
+
+  // Check if loaders already exist locally
+  let existingMeta = {};
+  try {
+    if (fs.existsSync(metaPath)) {
+      existingMeta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+    }
+  } catch (_) {}
+
+  const loaderTypes = ["falcao", "temp"];
+  const missing = loaderTypes.filter(t => {
+    if (!existingMeta[t]) return true;
+    return !fs.existsSync(path.join(loadersDir, existingMeta[t]));
+  });
+
+  if (missing.length === 0) {
+    console.log("[backup-discord] All loaders present locally, no restore needed.");
+    return true;
+  }
+
+  console.log(`[backup-discord] Restoring missing loaders: ${missing.join(", ")}`);
+
+  let lastId;
+  for (let page = 0; page < 20; page++) {
+    const opts = { limit: 100 };
+    if (lastId) opts.before = lastId;
+    const fetched = await channel.messages.fetch(opts).catch(() => null);
+    if (!fetched || !fetched.size) break;
+
+    const messages = [...fetched.values()].sort((a, b) => b.createdTimestamp - a.createdTimestamp);
+    for (const msg of messages) {
+      if (msg.author?.id !== clientInstance.user.id) continue;
+      for (const loaderType of [...missing]) {
+        const attachment = msg.attachments.find(a =>
+          a.name && a.name.startsWith(`loader-${loaderType}-`)
+        );
+        if (!attachment?.url) continue;
+        try {
+          const res = await fetch(attachment.url);
+          if (!res.ok) continue;
+          const buf = Buffer.from(await res.arrayBuffer());
+          fs.mkdirSync(loadersDir, { recursive: true });
+          const fileName = attachment.name.replace(`loader-${loaderType}-`, "");
+          const filePath = path.join(loadersDir, fileName);
+          fs.writeFileSync(filePath, buf);
+          existingMeta[loaderType] = fileName;
+          fs.writeFileSync(metaPath, JSON.stringify(existingMeta, null, 2), "utf8");
+          console.log(`[backup-discord] Restored loader ${loaderType}: ${fileName}`);
+          missing.splice(missing.indexOf(loaderType), 1);
+        } catch (_) {}
+      }
+      if (missing.length === 0) return true;
+    }
+
+    lastId = fetched.last()?.id;
+    if (fetched.size < 100) break;
+  }
+
+  return missing.length === 0;
+}
+
 async function pushPricesBackupToDiscord(clientInstance, reason = "change") {
   if (!clientInstance?.isReady()) {
     pricesBackupPushQueued = true;
@@ -1155,6 +1223,12 @@ client.once("ready", async () => {
   } catch (error) {
     console.error("[backup-discord] Prices restore on startup failed:", error.message);
     logError("backup_discord_prices_restore", error).catch(() => {});
+  }
+  // Restore loaders from Discord backup channel
+  try {
+    await restoreLoadersFromDiscord(client);
+  } catch (error) {
+    console.error("[backup-discord] Loaders restore failed:", error.message);
   }
   logDatabaseStatus();
   if (!process.env.DISCORD_CLIENT_ID && client.application?.id) {
@@ -1819,6 +1893,18 @@ client.on("interactionCreate", async (interaction) => {
         // Update meta
         meta[loaderType] = safeFileName;
         fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+
+        // Backup loader file to Discord backup channel so it survives restarts
+        try {
+          const backupChannel = await client.channels.fetch(KEYS_BACKUP_CHANNEL_ID);
+          if (backupChannel && backupChannel.isTextBased()) {
+            const attachment = new AttachmentBuilder(buf, { name: `loader-${loaderType}-${safeFileName}` });
+            await backupChannel.send({
+              content: `🔧 Loader backup • plan: **${loaderType}** • \`${safeFileName}\``,
+              files: [attachment]
+            });
+          }
+        } catch (_) { /* non-fatal */ }
 
         const planLabel = loaderType === "falcao" ? "Falcao" : "Temp";
         await safeReply(interaction, {
