@@ -333,8 +333,8 @@ function mountPaymentsApi(app, deps) {
 
   // ── POST /api/payments/create — create an order ──────────────────────────
   app.post("/api/payments/create", async (req, res) => {
-    const { method, plan, durationKey, discordId, discordUsername } = req.body || {};
-    if (!method || !plan || !durationKey || !discordId) {
+    const { method, plan: productId, durationKey, discordId, discordUsername } = req.body || {};
+    if (!method || !productId || !durationKey || !discordId) {
       res.status(400).json({ ok: false, message: "Faltan campos: method, plan, durationKey, discordId." });
       return;
     }
@@ -342,19 +342,43 @@ function mountPaymentsApi(app, deps) {
       res.status(400).json({ ok: false, message: "Método inválido." });
       return;
     }
-    if (!normalizePlan(plan)) {
-      res.status(400).json({ ok: false, message: "Plan inválido." });
+    if (!["week","monthly","lifetime"].includes(durationKey)) {
+      res.status(400).json({ ok: false, message: "Duración inválida." });
       return;
     }
 
     const prices = getWebPricesPayload();
-    // durationKey: "week" | "monthly" | "lifetime"
-    const planPrices = Object.values(prices.products || {})[plan === "both" ? 1 : plan === "temp" ? 1 : 0];
-    const priceEur = planPrices?.[durationKey];
-    if (!priceEur || typeof priceEur !== "number") {
-      res.status(400).json({ ok: false, message: "Duración o precio inválido." });
+    const products = prices.products || {};
+
+    // productId can be "product1", "product2", "falcao", "temp", "both"
+    // Resolve to a product entry and a license plan
+    let productEntry = products[productId];
+    let licensePlan = normalizePlan(productId); // works if they sent "falcao"/"temp"/"both"
+
+    if (!productEntry && !licensePlan) {
+      res.status(400).json({ ok: false, message: `Plan inválido: "${productId}". Usa product1, product2, falcao, temp o both.` });
       return;
     }
+
+    // If they sent a product key like "product1", infer the license plan from position
+    if (productEntry && !licensePlan) {
+      const productKeys = Object.keys(products);
+      const idx = productKeys.indexOf(productId);
+      // product1 → falcao, product2 → both (has spoofer), anything else → falcao
+      licensePlan = idx === 1 ? "both" : "falcao";
+    }
+
+    // If they sent "falcao"/"temp"/"both" directly, find price from first matching product
+    if (!productEntry && licensePlan) {
+      productEntry = Object.values(products)[0]; // fallback to first product price
+    }
+
+    const priceEur = productEntry?.[durationKey];
+    if (!priceEur || typeof priceEur !== "number") {
+      res.status(400).json({ ok: false, message: `Precio no disponible para "${durationKey}".` });
+      return;
+    }
+
     const durationDaysMap = { week: 7, monthly: 30, lifetime: 36500 };
     const durationDays = durationDaysMap[durationKey] || 30;
 
@@ -362,7 +386,7 @@ function mountPaymentsApi(app, deps) {
     const order = {
       orderId,
       method,
-      plan,
+      plan: licensePlan,  // the actual license plan (falcao/temp/both)
       durationDays,
       priceEur,
       discordId: String(discordId),
