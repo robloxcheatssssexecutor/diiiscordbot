@@ -1266,14 +1266,20 @@ client.once("ready", async () => {
     new SlashCommandBuilder().setName("offeroff").setDescription("Disable current active offer."),
     new SlashCommandBuilder()
       .setName("weboffer")
-      .setDescription("Activa una oferta en la web con precio tachado y banner.")
-      .addStringOption(o => o.setName("porcentaje").setDescription("Descuento/aumento, ej: -30 o +10 (número sin %)").setRequired(true))
-      .addStringOption(o => o.setName("duracion").setDescription("Duración, ej: 1h, 5d, 2w").setRequired(true))
+      .setDescription("Activa oferta web con precio tachado y banner.")
+      .addStringOption(o => o.setName("porcentaje").setDescription("Ej: -30 (descuento) o +10 (aumento)").setRequired(true))
+      .addStringOption(o => o.setName("duracion").setDescription("Duración: 1h, 5d, 2w...").setRequired(true))
       .addStringOption(o => o.setName("mensaje").setDescription("Mensaje personalizado (opcional)").setRequired(false))
-      .addStringOption(o => o.setName("anunciar").setDescription("Anunciar en el canal de ofertas? Si/No").setRequired(true)
+      .addStringOption(o => o.setName("anunciar").setDescription("Anunciar en canal de ofertas?").setRequired(true)
         .addChoices({ name: "Si", value: "si" }, { name: "No", value: "no" }))
-      .addStringOption(o => o.setName("everyone").setDescription("Mencionar @everyone en el anuncio? Si/No").setRequired(true)
+      .addStringOption(o => o.setName("everyone").setDescription("Mencionar @everyone?").setRequired(true)
         .addChoices({ name: "Si", value: "si" }, { name: "No", value: "no" })),
+    new SlashCommandBuilder()
+      .setName("paypalconfirm")
+      .setDescription("Confirmar o rechazar un pago PayPal pendiente.")
+      .addStringOption(o => o.setName("orderid").setDescription("Order ID del pago PayPal").setRequired(true))
+      .addStringOption(o => o.setName("accion").setDescription("Confirmar o rechazar").setRequired(true)
+        .addChoices({ name: "✅ Confirmar y entregar key", value: "confirm" }, { name: "❌ Rechazar", value: "reject" })),
     new SlashCommandBuilder()
       .setName("webprices")
       .setDescription("Set web landing page product prices.")
@@ -1366,8 +1372,33 @@ client.once("ready", async () => {
   ].map((cmd) => cmd.toJSON());
 
   client.application.commands.set(slashCommands).catch((error) => {
-    console.error("Could not register slash commands:", error.message);
+    console.error("Could not register global slash commands:", error.message);
   });
+
+  // Also register as guild commands for instant availability (guild commands update immediately)
+  const GUILD_ID = "1502005944945741864";
+  try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+    await guild.commands.set(slashCommands);
+    console.log(`[commands] Registered ${slashCommands.length} slash commands to guild ${GUILD_ID}`);
+  } catch (guildErr) {
+    console.error("[commands] Could not register guild slash commands:", guildErr.message);
+    // Try registering one by one to find the problematic command
+    try {
+      const guild = await client.guilds.fetch(GUILD_ID);
+      await guild.commands.set([]); // clear first
+      let registered = 0;
+      for (const cmd of slashCommands) {
+        try {
+          await guild.commands.create(cmd);
+          registered++;
+        } catch (singleErr) {
+          console.error(`[commands] Failed to register command "${cmd.name}":`, singleErr.message);
+        }
+      }
+      console.log(`[commands] Registered ${registered}/${slashCommands.length} commands individually`);
+    } catch (_) {}
+  }
 });
 
 setInterval(async () => {
@@ -1590,6 +1621,29 @@ client.on("interactionCreate", async (interaction) => {
       pricesPayload.offer = { discountPercent: 0, durationText: "", endsAt: null, expiredNotified: true };
       writePrices(pricesPayload);
       await safeReply(interaction, { content: "Offer disabled." });
+      return;
+    }
+
+    if (slashCommand === "paypalconfirm") {
+      const orderId = interaction.options.getString("orderid", true).trim();
+      const accion = interaction.options.getString("accion", true);
+      try {
+        const res = await fetch(`http://localhost:${API_PORT}/api/payments/admin/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-secret": process.env.MENU_API_TOKEN || "" },
+          body: JSON.stringify({ orderId, action: accion })
+        });
+        const data = await res.json();
+        if (accion === "confirm" && data.ok) {
+          await safeReply(interaction, { content: `✅ Pago confirmado. Key entregada: \`${data.key}\`\nOrder: \`${orderId}\`` });
+        } else if (accion === "reject" && data.ok) {
+          await safeReply(interaction, { content: `❌ Pago rechazado. Order: \`${orderId}\`` });
+        } else {
+          await safeReply(interaction, { content: `Error: ${data.message || "Orden no encontrada."}` });
+        }
+      } catch (err) {
+        await safeReply(interaction, { content: `Error interno: ${err.message}` });
+      }
       return;
     }
 

@@ -236,6 +236,18 @@ function deliverKey(order, deps) {
   if (appendKeyLog && dataDir) {
     appendKeyLog(dataDir, key, "created", { method: "payment", plan: record.plan, durationDays: order.durationDays, orderId: order.orderId });
   }
+
+  // Auto-claim the key to the buyer's Discord account
+  if (order.discordId) {
+    const found2 = getKeyRecord(db, key);
+    if (found2 && !found2.claimedBy) {
+      found2.claimedBy = order.discordId;
+      found2.claimedByUsername = order.discordUsername || order.discordId;
+      found2.claimedAt = new Date().toISOString();
+      writeDb(db);
+    }
+  }
+
   return key;
 }
 
@@ -329,6 +341,110 @@ function flattenForStripe(obj, prefix = "") {
     }
   }
   return out;
+}
+
+// ── Order status page HTML builder ────────────────────────────────────────
+function buildOrderPageHtml(orderId) {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Orden ${orderId} — Falcao External</title>
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png"/>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--bg:#08080c;--card:#121217;--card2:#1a1a22;--stroke:#2a2a35;--text:#e8e8ee;--muted:#8a8a9a;--accent:#e85822;--green:#22c55e;--red:#ef4444;--yellow:#eab308}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100vh;font-family:"Instrument Sans",system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+    .card{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:28px;width:100%;max-width:480px}
+    .logo{text-align:center;margin-bottom:20px}
+    .logo img{width:56px;height:56px;border-radius:12px}
+    h1{font-size:1.2rem;font-weight:700;text-align:center;margin-bottom:4px}
+    .order-id{text-align:center;font-size:.78rem;color:var(--muted);margin-bottom:20px;font-family:monospace}
+    .field{background:var(--card2);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+    .field-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+    .field-value{font-size:.9rem;font-weight:600}
+    .ltc-addr{font-family:monospace;font-size:.78rem;word-break:break-all;background:var(--bg);padding:8px;border-radius:7px;border:1px solid var(--stroke);margin-top:6px}
+    .status-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;font-size:.82rem;font-weight:600}
+    .status-pending{background:rgba(234,179,8,.15);color:var(--yellow);border:1px solid rgba(234,179,8,.3)}
+    .status-delivered{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+    .status-expired{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+    .status-row{text-align:center;margin:16px 0}
+    .spinner{width:18px;height:18px;border:2px solid var(--stroke);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 20px;border-radius:10px;font-size:.88rem;font-weight:600;cursor:pointer;text-decoration:none;border:none;font-family:inherit;margin-top:12px;width:100%;transition:opacity .13s}
+    .btn:hover{opacity:.88}
+    .btn-accent{background:var(--accent);color:#fff}
+    .btn-secondary{background:var(--card2);color:var(--text);border:1px solid var(--stroke)}
+    .msg{margin-top:12px;padding:11px;border-radius:9px;font-size:.85rem;display:none;text-align:center}
+    .msg.ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--green);display:block}
+    .msg.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);display:block}
+    a.home{display:block;text-align:center;margin-top:16px;color:var(--muted);font-size:.82rem;text-decoration:none}
+    a.home:hover{color:var(--text)}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><img src="https://i.imgur.com/lst2PVm.png" alt="logo"/></div>
+  <h1>Estado de tu orden</h1>
+  <div class="order-id">${orderId}</div>
+  <div id="orderBody"><div style="text-align:center;color:var(--muted)"><span class="spinner"></span> Cargando...</div></div>
+</div>
+<a class="home" href="/">← Volver al inicio</a>
+<script>
+const ORDER_ID="${orderId}";
+const METHOD_NAMES={stripe:"Stripe",ltc:"Litecoin",paypal:"PayPal F&F"};
+const PLAN_LABEL={falcao:"Falcao",temp:"Temp",both:"Both"};
+function statusBadge(s){
+  const m={pending_payment:["status-pending","⏳ Pendiente de pago"],paid:["status-delivered","💰 Pagado"],delivered:["status-delivered","✅ Entregado"],expired:["status-expired","⏰ Expirada"],cancelled:["status-expired","❌ Cancelada"]};
+  const[cls,label]=m[s]||["status-pending","⏳ "+s];
+  return \`<span class="status-badge \${cls}">\${label}</span>\`;
+}
+async function loadOrder(){
+  try{
+    const d=await fetch("/api/payments/order/"+ORDER_ID).then(r=>r.json());
+    if(!d.ok){document.getElementById("orderBody").innerHTML='<p style="color:var(--red);text-align:center">Orden no encontrada.</p>';return;}
+    const o=d.order||d;
+    let extra="";
+    if(o.status==="pending_payment"&&o.method==="ltc"){
+      extra=\`<div class="field"><div class="field-label">Enviar LTC a</div><div class="ltc-addr">\${o.ltcAddress||""}</div>
+      <div class="field-label" style="margin-top:8px">Cantidad exacta</div><div class="field-value">\${o.ltcAmountExpected||"?"} LTC</div></div>
+      <p style="font-size:.75rem;color:var(--muted);text-align:center;margin-top:8px">Confirmación automática tras 1 bloque</p>\`;
+    }else if(o.status==="pending_payment"&&o.method==="paypal"){
+      extra=\`<div class="field"><div class="field-label">Enviar pago F&F a</div><div class="field-value">\${o.paypalEmail||""}</div>
+      <div class="field-label" style="margin-top:8px">Referencia (incluir en nota)</div><div class="field-value" style="font-family:monospace">\${ORDER_ID}</div></div>
+      <button class="btn btn-accent" onclick="notifyPayPal()">Ya pagué — Notificar al admin</button>
+      <div id="ppStatus" class="msg"></div>\`;
+    }else if(o.status==="delivered"){
+      extra=\`<div class="field"><div class="field-label">Key entregada</div><div class="field-value" style="font-family:monospace">\${o.keyDelivered||"—"}</div></div>
+      <p style="font-size:.78rem;color:var(--muted);text-align:center;margin-top:8px">La key ha sido reclamada automáticamente en tu cuenta.</p>\`;
+    }
+    document.getElementById("orderBody").innerHTML=\`
+      <div class="status-row">\${statusBadge(o.status)}</div>
+      <div class="field"><div class="field-label">Método</div><div class="field-value">\${METHOD_NAMES[o.method]||o.method}</div></div>
+      <div class="field"><div class="field-label">Plan</div><div class="field-value">\${PLAN_LABEL[o.plan]||o.plan}</div></div>
+      <div class="field"><div class="field-label">Precio</div><div class="field-value">€\${o.priceEur}</div></div>
+      <div class="field"><div class="field-label">Duración</div><div class="field-value">\${o.durationDays===36500?"Lifetime":o.durationDays+" días"}</div></div>
+      \${extra}
+      <a class="btn btn-secondary" href="/?tab=account">Ver mis keys →</a>\`;
+    if(o.status==="pending_payment"&&(o.method==="ltc"||o.method==="stripe")){
+      setTimeout(()=>location.reload(),15000);
+    }
+  }catch(_){document.getElementById("orderBody").innerHTML='<p style="color:var(--red);text-align:center">Error cargando la orden.</p>';}
+}
+async function notifyPayPal(){
+  const st=document.getElementById("ppStatus");
+  st.className="msg";st.textContent="Enviando...";st.style.display="block";
+  try{
+    const d=await fetch("/api/payments/paypal/notify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderId:ORDER_ID,discordId:null})}).then(r=>r.json());
+    st.className="msg "+(d.ok?"ok":"err");st.textContent=d.ok?"✅ "+d.message:"❌ "+d.message;
+  }catch(_){st.className="msg err";st.textContent="Error de red.";}
+}
+loadOrder();
+</script>
+</body>
+</html>`;
 }
 
 // ── Mount payments API ─────────────────────────────────────────────────────
@@ -580,9 +696,66 @@ function mountPaymentsApi(app, deps) {
     res.json({ ok: true, spending: list });
   });
   app.get("/api/payments/order/:id", (req, res) => {
-    const order = pendingOrders.get(req.params.id);
+    const orderId = req.params.id;
+    // Check in-memory first
+    let order = pendingOrders.get(orderId);
+    // If not in memory, check orders.json (delivered/expired orders)
+    if (!order && ordersPath && fs.existsSync(ordersPath)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(ordersPath, "utf8"));
+        order = (raw.orders || []).find(o => o.orderId === orderId);
+      } catch (_) {}
+    }
     if (!order) { res.status(404).json({ ok: false }); return; }
-    res.json({ ok: true, status: order.status, keyDelivered: order.keyDelivered, ltcAmount: order.ltcAmountExpected, ltcAddress: LTC_ADDRESS });
+    res.json({ ok: true, order: {
+      orderId: order.orderId,
+      method: order.method,
+      plan: order.plan,
+      durationDays: order.durationDays,
+      priceEur: order.priceEur,
+      status: order.status,
+      keyDelivered: order.keyDelivered,
+      ltcAmountExpected: order.ltcAmountExpected,
+      ltcAddress: LTC_ADDRESS,
+      paypalEmail: PAYPAL_EMAIL,
+      stripeSessionUrl: order.stripeSessionUrl,
+      createdAt: order.createdAt,
+      expiresAt: order.expiresAt
+    }});
+  });
+
+  // ── GET /order/:id — dedicated order status page ──────────────────────────
+  app.get("/order/:id", (req, res) => {
+    const orderId = req.params.id;
+    res.type("html").send(buildOrderPageHtml(orderId));
+  });
+
+  // ── GET /api/payments/history/:discordId — purchase history for a user ──
+  app.get("/api/payments/history/:discordId", (req, res) => {
+    const discordId = String(req.params.discordId || "");
+    if (!discordId) { res.status(400).json({ ok: false }); return; }
+    const orders = [];
+    if (ordersPath && fs.existsSync(ordersPath)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(ordersPath, "utf8"));
+        for (const o of (raw.orders || [])) {
+          if (o.discordId === discordId) {
+            orders.push({
+              orderId: o.orderId,
+              method: o.method,
+              plan: o.plan,
+              durationDays: o.durationDays,
+              priceEur: o.priceEur,
+              status: o.status,
+              keyDelivered: o.keyDelivered,
+              createdAt: o.createdAt
+            });
+          }
+        }
+      } catch (_) {}
+    }
+    orders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    res.json({ ok: true, orders });
   });
 
   // ── POST /api/payments/admin/confirm — admin confirms PayPal ─────────────

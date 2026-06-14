@@ -433,6 +433,33 @@ async function loadAccountContent(){
     await fetch("/api/account/auth/logout",{method:"POST"});
     window.location.reload();
   });
+
+  // Load purchase history
+  let historyHtml = '';
+  try {
+    const hd = await fetch(`/api/payments/history/${currentUser.discordId}`).then(r => r.json());
+    const orders = hd.orders || [];
+    if (orders.length) {
+      const METHOD = {stripe:'💳 Stripe', ltc:'🪙 LTC', paypal:'🐦 PayPal'};
+      const PLAN = {falcao:'Falcao', temp:'Temp', both:'Both'};
+      const rows = orders.map(o => {
+        const date = o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+        const statusColor = {delivered:'var(--green)',expired:'var(--red)',cancelled:'var(--red)',pending_payment:'var(--yellow)'}[o.status]||'var(--muted)';
+        return `<div style="background:var(--card2);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:.82rem;color:var(--muted)">${date}</span>
+          <span style="font-weight:600;font-size:.88rem">${PLAN[o.plan]||o.plan}</span>
+          <span style="font-size:.8rem;color:var(--muted)">${o.durationDays===36500?'Lifetime':o.durationDays+'d'}</span>
+          <span style="font-size:.8rem">${METHOD[o.method]||o.method}</span>
+          <span style="font-weight:700;color:var(--accent)">€${o.priceEur}</span>
+          <span style="font-size:.78rem;color:${statusColor};margin-left:auto">${o.status}</span>
+          <a href="/order/${o.orderId}" style="font-size:.75rem;color:var(--accent);text-decoration:none">Ver →</a>
+        </div>`;
+      }).join('');
+      historyHtml = `<p class="section-label" style="margin-top:24px">🧾 Historial de compras</p><div style="display:flex;flex-direction:column;gap:8px">${rows}</div>`;
+    }
+  } catch (_) {}
+
+  ct.innerHTML = ct.innerHTML + historyHtml;
 }
 
 // ── Claim ──────────────────────────────────────────────────────────────
@@ -567,34 +594,8 @@ async function startCheckout() {
     }).then(r => r.json());
     if (!d.ok) { box.innerHTML = `<div class="msg err" style="display:block">${d.message}</div>`; return; }
     activeOrder = d;
-
-    if (d.method === "stripe") {
-      box.innerHTML = `<div class="shop-order-box"><h3>💳 Pago con Stripe</h3>
-        <p style="color:var(--muted);font-size:.85rem;margin-bottom:14px">Serás redirigido a Stripe Checkout.</p>
-        <a class="btn btn-accent" href="${d.stripeUrl}" target="_blank">Pagar ${d.priceEur}€ →</a></div>`;
-    } else if (d.method === "ltc") {
-      box.innerHTML = `<div class="shop-order-box"><h3>🪙 Pago con Litecoin</h3>
-        <div class="order-info">
-          Envía exactamente <b>${d.ltcAmount} LTC</b> a:<br>
-          <div class="ltc-addr">${d.ltcAddress}</div>
-          Precio: <b>${d.priceEur}€</b> · Order: <b>${d.orderId}</b><br>
-          Expira: <b>${new Date(d.expiresAt).toLocaleTimeString("es-ES")}</b>
-        </div>
-        <div class="order-status" id="ltcStatus"><div class="spinner"></div> Esperando en blockchain...</div>
-        <p style="font-size:.75rem;color:var(--muted);margin-top:8px">Confirmación automática (~1 bloque). Recibirás tu key por Discord DM.</p>
-      </div>`;
-      pollOrder(d.orderId);
-    } else if (d.method === "paypal") {
-      box.innerHTML = `<div class="shop-order-box"><h3>🐦 Pago con PayPal F&F</h3>
-        <div class="order-info">
-          Envía <b>${d.priceEur}€</b> como Amigos y Familiares a:<br>
-          <div class="ltc-addr">${d.paypalEmail}</div>
-          Incluye este Order ID en la nota: <b>${d.reference}</b>
-        </div>
-        <button class="btn btn-accent" style="max-width:280px;margin-top:4px" onclick="notifyPayPal('${d.orderId}')">Ya pagué — Notificar al admin</button>
-        <div id="paypalStatus" style="margin-top:10px"></div>
-      </div>`;
-    }
+    // Redirect to dedicated order page (persists on reload)
+    window.location.href = `/order/${d.orderId}`;
   } catch (e) {
     box.innerHTML = `<div class="msg err" style="display:block">Error: ${e.message}</div>`;
   }
