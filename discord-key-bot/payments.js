@@ -99,30 +99,55 @@ async function sendDiscordWebhook(url, payload) {
 }
 
 async function notifyAdminPayPalPending(order) {
+  // Use the Discord bot to send the message with interactive buttons
+  // (webhooks cannot send interactive components)
+  const disc = getDiscordClient();
+  if (disc && disc.isReady()) {
+    try {
+      // Parse channel ID from the webhook URL
+      const whParts = ADMIN_DISCORD_WH.split("/");
+      const channelId = whParts[whParts.length - 2];
+      const channel = await disc.channels.fetch(channelId).catch(() => null);
+      if (channel && channel.isTextBased()) {
+        const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
+        const embed = new EmbedBuilder()
+          .setColor(0xf6a800)
+          .setTitle("💰 Pago PayPal pendiente de verificación")
+          .addFields(
+            { name: "Usuario", value: `${order.discordUsername} (<@${order.discordId}>)`, inline: true },
+            { name: "Plan", value: `${order.plan} · ${order.durationDays} días`, inline: true },
+            { name: "Precio", value: `€${order.priceEur}`, inline: true },
+            { name: "Email PayPal", value: `\`${PAYPAL_EMAIL}\``, inline: true },
+            { name: "Order ID", value: `\`${order.orderId}\``, inline: true }
+          )
+          .setDescription("El cliente dice que ya ha pagado. Verifica en tu cuenta PayPal y pulsa el botón correspondiente.");
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`paypal_confirm:${order.orderId}`)
+            .setLabel("✅ Confirmar pago y entregar key")
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`paypal_reject:${order.orderId}`)
+            .setLabel("❌ Rechazar pago")
+            .setStyle(ButtonStyle.Danger)
+        );
+        await channel.send({ embeds: [embed], components: [row] });
+        return;
+      }
+    } catch (err) {
+      console.error("[payments] Could not send PayPal notification via bot:", err.message);
+    }
+  }
+
+  // Fallback: plain webhook without buttons
   const content = `💰 **Pago PayPal pendiente de verificación**\n\n` +
     `**Usuario:** ${order.discordUsername} (<@${order.discordId}>)\n` +
     `**Plan:** ${order.plan} · ${order.durationDays} días\n` +
     `**Precio:** €${order.priceEur}\n` +
     `**Email PayPal:** \`${PAYPAL_EMAIL}\`\n` +
     `**Order ID:** \`${order.orderId}\`\n\n` +
-    `El cliente dice que ya ha pagado. Verifica en tu cuenta PayPal y pulsa el botón correspondiente.`;
-
-  await sendDiscordWebhook(ADMIN_DISCORD_WH, {
-    content,
-    components: [{
-      type: 1,
-      components: [
-        {
-          type: 2, style: 3, label: "✅ Confirmar pago y entregar key",
-          custom_id: `paypal_confirm:${order.orderId}`
-        },
-        {
-          type: 2, style: 4, label: "❌ Rechazar pago",
-          custom_id: `paypal_reject:${order.orderId}`
-        }
-      ]
-    }]
-  });
+    `El cliente dice que ya ha pagado. Usa \`/paypalconfirm ${order.orderId}\` para confirmar.`;
+  await sendDiscordWebhook(ADMIN_DISCORD_WH, { content });
 }
 
 async function notifyAdminStripeConfirmed(order) {
@@ -534,7 +559,26 @@ function mountPaymentsApi(app, deps) {
     res.json({ received: true });
   });
 
-  // ── GET /api/payments/order/:id — check order status ─────────────────────
+  // ── GET /api/payments/spending — total spent per discord user ────────────
+  app.get("/api/payments/spending", (_req, res) => {
+    // Read all orders from file
+    const spending = {};
+    if (ordersPath && fs.existsSync(ordersPath)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(ordersPath, "utf8"));
+        for (const o of (raw.orders || [])) {
+          if (o.status !== "delivered") continue;
+          const uid = o.discordId;
+          if (!uid) continue;
+          if (!spending[uid]) spending[uid] = { discordId: uid, username: o.discordUsername || uid, total: 0, orders: 0 };
+          spending[uid].total += Number(o.priceEur) || 0;
+          spending[uid].orders += 1;
+        }
+      } catch (_) {}
+    }
+    const list = Object.values(spending).sort((a, b) => b.total - a.total);
+    res.json({ ok: true, spending: list });
+  });
   app.get("/api/payments/order/:id", (req, res) => {
     const order = pendingOrders.get(req.params.id);
     if (!order) { res.status(404).json({ ok: false }); return; }

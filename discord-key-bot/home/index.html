@@ -160,6 +160,7 @@
     <button class="nav-tab" data-section="account" onclick="nav('account')">Mi Cuenta</button>
     <button class="nav-tab" data-section="claim" onclick="nav('claim')" id="claimTab">Reclamar Key</button>
     <button class="nav-tab" data-section="shop" onclick="nav('shop')">Comprar</button>
+    <a class="nav-tab" id="manageTab" href="/manage" style="display:none">Manage</a>
   </div>
   <div class="topbar-right" id="topbarRight"></div>
 </header>
@@ -274,9 +275,11 @@ async function loadAuth(){
     if(status.authenticated){
       currentUser=status;
       document.getElementById("claimTab").style.display="flex";
+      // Show manage tab only for admins
+      const manageTab = document.getElementById("manageTab");
+      if(manageTab) manageTab.style.display = manage.authenticated ? "flex" : "none";
+      // Topbar right: just avatar, no duplicate "Mi Cuenta" link
       tr.innerHTML=`
-        <a class="top-link" href="#" onclick="nav('account');return false">Mi Cuenta</a>
-        ${isAdmin?`<a class="top-link" href="/manage" style="color:rgba(138,138,154,.7);font-size:.78rem">Manage</a>`:""}
         <a class="avatar-link" href="#" onclick="nav('account');return false">
           <img src="${status.discordAvatar}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
           ${status.discordUsername}
@@ -284,8 +287,9 @@ async function loadAuth(){
     }else{
       currentUser=null;
       document.getElementById("claimTab").style.display="none";
+      const manageTab = document.getElementById("manageTab");
+      if(manageTab) manageTab.style.display = "none";
       tr.innerHTML=`
-        ${isAdmin?`<a class="top-link" href="/manage" style="font-size:.78rem">Manage</a>`:""}
         <div class="auth-btns">
           <a class="btn-login" href="/api/account/auth/login">Iniciar sesión</a>
           <a class="btn-register" href="/api/account/auth/login">Registrarse</a>

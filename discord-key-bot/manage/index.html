@@ -118,6 +118,20 @@
       </div>
       <div class="pagination" id="pagination"></div>
     </div>
+
+    <!-- SPENDING SECTION -->
+    <div class="card" style="margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span style="font-weight:600;font-size:.9rem">💰 Gasto por usuario</span>
+        <button class="btn sm secondary" type="button" id="refreshSpendingBtn">↻</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Usuario</th><th>Discord ID</th><th>Pedidos</th><th>Total gastado</th></tr></thead>
+          <tbody id="spendingBody"><tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -165,7 +179,7 @@ function showAuth(ok){
 }
 
 async function checkAuth(){
-  try{const d=await api("/api/manage/auth/status");showAuth(!!d.authenticated);if(d.authenticated)loadKeys();}
+  try{const d=await api("/api/manage/auth/status");showAuth(!!d.authenticated);if(d.authenticated){loadKeys();loadSpending();}}
   catch(_){showAuth(false);}
 }
 
@@ -419,6 +433,30 @@ $("refreshBtn").onclick=()=>loadKeys(1);
 let searchTimer;
 $("searchInput").oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadKeys(1),350);};
 $("filterStatus").onchange=()=>loadKeys(1);
+
+async function loadSpending(){
+  const body=$("spendingBody");
+  if(!body)return;
+  body.innerHTML='<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px">Cargando...</td></tr>';
+  try{
+    const d=await api("/api/payments/spending");
+    const rows=(d.spending||[]);
+    if(!rows.length){
+      body.innerHTML='<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px">Sin compras registradas aún.</td></tr>';
+      return;
+    }
+    body.innerHTML=rows.map(r=>`<tr>
+      <td data-label="Usuario">${r.username||"—"}</td>
+      <td data-label="Discord ID" style="font-size:.75rem;color:var(--muted)">${r.discordId}</td>
+      <td data-label="Pedidos" style="text-align:center">${r.orders}</td>
+      <td data-label="Total" style="font-weight:700;color:var(--ok)">€${Number(r.total).toFixed(2)}</td>
+    </tr>`).join("");
+  }catch(e){
+    body.innerHTML=`<tr><td colspan="4" style="color:var(--err)">Error: ${e.message}</td></tr>`;
+  }
+}
+
+document.getElementById("refreshSpendingBtn")?.addEventListener("click",loadSpending);
 
 checkAuth();
 </script>
