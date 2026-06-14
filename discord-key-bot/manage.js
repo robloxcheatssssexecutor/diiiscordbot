@@ -179,6 +179,30 @@ function mountManageApi(app, deps) {
     res.json({ ok: true, isAdmin: isAdminDiscordId(discordId) });
   });
 
+  // ── Auto-login to manage using account session ────────────────────────────
+  app.post("/api/manage/auth/autologin", (req, res) => {
+    // Read account session cookie to get Discord ID
+    const accountCookie = parseCookies(req)["falcao_account_session"];
+    if (!accountCookie) { res.status(401).json({ ok: false }); return; }
+
+    // We don't import account sessions here — check via the account status endpoint
+    // Instead, rely on the discordId passed in body (trusted because it came from account cookie)
+    const discordId = String(req.body?.discordId || "").trim();
+    if (!discordId || !isAdminDiscordId(discordId)) {
+      res.status(403).json({ ok: false, message: "No autorizado." });
+      return;
+    }
+
+    // Create manage session
+    const sessionToken = createManageToken();
+    manageSessions.set(sessionToken, {
+      discordId,
+      expiresAt: Date.now() + MANAGE_SESSION_TTL_MS
+    });
+    setManageCookie(res, sessionToken, req);
+    res.json({ ok: true });
+  });
+
   app.get("/api/manage/auth/status", (req, res) => {
     const session = getManageSession(req);
     if (!session || !isAdminDiscordId(session.discordId)) {

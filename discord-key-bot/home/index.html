@@ -160,7 +160,7 @@
     <button class="nav-tab" data-section="account" onclick="nav('account')">Mi Cuenta</button>
     <button class="nav-tab" data-section="claim" onclick="nav('claim')" id="claimTab">Reclamar Key</button>
     <button class="nav-tab" data-section="shop" onclick="nav('shop')">Comprar</button>
-    <a class="nav-tab" id="manageTab" href="/manage" style="display:none">Manage</a>
+    <button class="nav-tab" id="manageTab" data-section="manage" onclick="nav('manage')" style="display:none">Manage</button>
   </div>
   <div class="topbar-right" id="topbarRight"></div>
 </header>
@@ -211,6 +211,11 @@
     <div id="shopContent"></div>
   </div>
 
+  <!-- ── MANAGE ── -->
+  <div class="section" id="sec-manage">
+    <div id="manageContent"></div>
+  </div>
+
   <!-- ── CLAIM ── -->
   <div class="section" id="sec-claim">
     <div class="claim-wrap">
@@ -259,6 +264,7 @@ function nav(id){
   if(id==="account")loadAccountContent();
   if(id==="home")loadPrices();
   if(id==="shop")loadShopContent();
+  if(id==="manage")loadManageContent();
 }
 
 // ── Auth ───────────────────────────────────────────────────────────────
@@ -583,13 +589,37 @@ function pollOrder(orderId) {
   }, 15000);
 }
 
+// ── Manage ─────────────────────────────────────────────────────────────
+let manageLoaded = false;
+
+async function loadManageContent() {
+  const ct = document.getElementById("manageContent");
+  if (!ct) return;
+  if (manageLoaded) return; // already loaded
+  ct.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:var(--muted);padding:20px"><div class="spinner"></div> Cargando panel de administración...</div>`;
+
+  // Auto-login to manage using the account Discord ID
+  if (currentUser) {
+    try {
+      await fetch("/api/manage/auth/autologin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discordId: currentUser.discordId })
+      });
+    } catch (_) {}
+  }
+
+  manageLoaded = true;
+  ct.innerHTML = `<iframe src="/manage" style="width:100%;height:calc(100vh - 80px);border:none;border-radius:12px;background:var(--card)" title="Manage"></iframe>`;
+}
+
 // ── Init ───────────────────────────────────────────────────────────────
 async function init(){
   await loadAuth();
   loadPrices();
   // Route based on URL
   const tab=new URLSearchParams(location.search).get("tab")||"home";
-  const validTabs=["home","panel","account","claim","shop"];
+  const validTabs=["home","panel","account","claim","shop","manage"];
   nav(validTabs.includes(tab)?tab:"home");
 }
 init();
