@@ -110,7 +110,13 @@
     .success-box h2{margin-bottom:6px}
     .success-box p{color:var(--muted);font-size:.85rem}
 
-    /* ── PANEL EMBED ── */
+    /* ── OFFER BANNER ── */
+    .offer-banner{background:linear-gradient(90deg,rgba(34,197,94,.15),rgba(34,197,94,.08));border:1px solid rgba(34,197,94,.35);border-radius:12px;padding:12px 18px;margin:0 0 22px;display:none;align-items:center;gap:12px;flex-wrap:wrap}
+    .offer-banner .ob-icon{font-size:1.4rem}
+    .offer-banner .ob-text{flex:1;font-size:.88rem;font-weight:600;color:#22c55e}
+    .offer-banner .ob-timer{font-size:.78rem;color:var(--muted)}
+    .price-old{text-decoration:line-through;color:var(--muted);font-size:.8rem;margin-right:4px}
+    .price-new{color:#22c55e;font-weight:700}
     #panelFrame{width:100%;height:calc(100vh - 100px);border:none;border-radius:14px;background:var(--card)}
 
     /* ── SHOP ── */
@@ -169,6 +175,12 @@
 
   <!-- ── HOME ── -->
   <div class="section active" id="sec-home">
+    <!-- Offer banner (shown when active) -->
+    <div class="offer-banner" id="offerBanner">
+      <span class="ob-icon">🔥</span>
+      <span class="ob-text" id="offerBannerText">Oferta activa</span>
+      <span class="ob-timer" id="offerBannerTimer"></span>
+    </div>
     <div class="hero">
       <img class="hero-logo" src="https://i.imgur.com/lst2PVm.png" alt="logo" fetchpriority="high"/>
       <h1>Falcao External</h1>
@@ -312,22 +324,49 @@ async function loadPrices(){
   if(!grid||grid.dataset.loaded)return;
   try{
     const data=await fetch("/api/web/prices").then(r=>r.json());
+    const disc=data.discountActive&&data.discountPercent>0?data.discountPercent:0;
+    const offer=data.offer||{};
+    const absPct=Math.abs(offer.discountPercent||0);
+
+    // Offer banner
+    const banner=document.getElementById("offerBanner");
+    const bannerText=document.getElementById("offerBannerText");
+    const bannerTimer=document.getElementById("offerBannerTimer");
+    if(banner&&offer.endsAt&&absPct>0&&new Date(offer.endsAt).getTime()>Date.now()){
+      banner.style.display="flex";
+      bannerText.textContent=offer.customMessage||(disc>0?`🔥 -${absPct}% DESCUENTO — ¡Oferta limitada! Aprovéchala antes de que acabe.`:`📈 Actualización de precios +${absPct}%`);
+      const endMs=new Date(offer.endsAt).getTime();
+      function updateTimer(){
+        const diff=endMs-Date.now();
+        if(diff<=0){if(banner)banner.style.display="none";return;}
+        const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
+        if(bannerTimer)bannerTimer.textContent=`Acaba en: ${h>0?h+"h ":""}${m}m ${s}s`;
+      }
+      updateTimer();setInterval(updateTimer,1000);
+    }
+
     grid.innerHTML="";
     Object.values(data.products||{}).forEach((p,i)=>{
       const card=document.createElement("div");card.className="price-card";
+      card.style.animationDelay=(i*.08)+"s";
+      const rows=["week","monthly","lifetime"].map(dk=>{
+        const newP=p[dk];
+        if(typeof newP!=="number")return`<tr><td>${PLAN_LABELS[dk]}</td><td>—</td></tr>`;
+        const origP=disc>0?Number((newP/(1-disc/100)).toFixed(2)):null;
+        const priceHtml=origP
+          ?`<span class="price-old">${origP}€</span> <span class="price-new">${newP.toFixed(2)}€</span>`
+          :`${newP.toFixed(2)}€`;
+        return`<tr><td>${PLAN_LABELS[dk]}</td><td>${priceHtml}</td></tr>`;
+      }).join("");
       card.innerHTML=`<h3>${p.name||"Producto"}</h3><table>
         <thead><tr><th>Plan</th><th>Precio</th></tr></thead>
-        <tbody>
-          <tr><td>${PLAN_LABELS.week}</td><td>${fmtPrice(p.week)}</td></tr>
-          <tr><td>${PLAN_LABELS.monthly}</td><td>${fmtPrice(p.monthly)}</td></tr>
-          <tr><td>${PLAN_LABELS.lifetime}</td><td>${fmtPrice(p.lifetime)}</td></tr>
-        </tbody></table>`;
+        <tbody>${rows}</tbody></table>`;
       grid.appendChild(card);
     });
     grid.dataset.loaded="1";
     const pill=document.getElementById("offerPill");
-    if(data.discountActive&&data.discountPercent>0){pill.style.display="block";pill.textContent="🔥 Oferta -"+data.discountPercent+"%";}
-  }catch(_){grid.innerHTML='<div class="price-card"><h3>No disponible</h3></div>';}
+    if(pill&&disc>0){pill.style.display="block";pill.textContent="🔥 Oferta -"+disc+"% activa";}
+  }catch(_){if(grid)grid.innerHTML='<div class="price-card"><h3>No disponible</h3></div>';}
 }
 
 // ── Account content ────────────────────────────────────────────────────

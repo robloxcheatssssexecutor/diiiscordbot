@@ -1265,6 +1265,16 @@ client.once("ready", async () => {
       .addStringOption((o) => o.setName("duracion").setDescription("Duration e.g. 7d, 24h").setRequired(true)),
     new SlashCommandBuilder().setName("offeroff").setDescription("Disable current active offer."),
     new SlashCommandBuilder()
+      .setName("weboffer")
+      .setDescription("Activa oferta web con precio tachado y banner.")
+      .addStringOption(o => o.setName("porcentaje").setDescription("Ej: -30 (descuento) o +10 (aumento)").setRequired(true))
+      .addStringOption(o => o.setName("duracion").setDescription("Duración: 1h, 5d, 2w...").setRequired(true))
+      .addStringOption(o => o.setName("mensaje").setDescription("Mensaje personalizado (opcional)").setRequired(false))
+      .addStringOption(o => o.setName("anunciar").setDescription("Anunciar en canal de ofertas?").setRequired(true)
+        .addChoices({ name: "Si", value: "si" }, { name: "No", value: "no" }))
+      .addStringOption(o => o.setName("everyone").setDescription("Mencionar @everyone?").setRequired(true)
+        .addChoices({ name: "Si", value: "si" }, { name: "No", value: "no" })),
+    new SlashCommandBuilder()
       .setName("webprices")
       .setDescription("Set web landing page product prices.")
       .addStringOption((o) =>
@@ -1356,8 +1366,18 @@ client.once("ready", async () => {
   ].map((cmd) => cmd.toJSON());
 
   client.application.commands.set(slashCommands).catch((error) => {
-    console.error("Could not register slash commands:", error.message);
+    console.error("Could not register global slash commands:", error.message);
   });
+
+  // Also register as guild commands for instant availability (guild commands update immediately)
+  const GUILD_ID = "1502005944945741864";
+  try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+    await guild.commands.set(slashCommands);
+    console.log(`[commands] Registered ${slashCommands.length} slash commands to guild ${GUILD_ID}`);
+  } catch (guildErr) {
+    console.error("[commands] Could not register guild slash commands:", guildErr.message);
+  }
 });
 
 setInterval(async () => {
@@ -1375,13 +1395,29 @@ setInterval(async () => {
     pricesPayload.offer.expiredNotified = true;
     writePrices(pricesPayload);
 
-    const embed = new EmbedBuilder()
-      .setColor(BRAND_ORANGE)
-      .setTitle("FALCAO EXTERNAL OFFER ENDED")
-      .setThumbnail(PANEL_LOGO_URL)
-      .setDescription("The active offer has expired. Standard prices are now active again.")
-      .setTimestamp(new Date());
-    await sendLogEmbed(client, OFFER_CHANNEL_ID, embed);
+    // If this was a weboffer with an announced channel, send end notice there
+    if (offer.isWebOffer && offer.announcedChannel) {
+      try {
+        const ch = await client.channels.fetch(offer.announcedChannel).catch(() => null);
+        if (ch && ch.isTextBased()) {
+          const embed = new EmbedBuilder()
+            .setColor(0x8a8a9a)
+            .setTitle("⏰ Oferta finalizada")
+            .setDescription("La oferta ha expirado. Los precios han vuelto a la normalidad.")
+            .setTimestamp(new Date());
+          await ch.send({ embeds: [embed] }); // no @everyone on expiry
+        }
+      } catch (_) {}
+    } else {
+      // Legacy: send to old OFFER_CHANNEL_ID
+      const embed = new EmbedBuilder()
+        .setColor(BRAND_ORANGE)
+        .setTitle("FALCAO EXTERNAL OFFER ENDED")
+        .setThumbnail(PANEL_LOGO_URL)
+        .setDescription("The active offer has expired. Standard prices are now active again.")
+        .setTimestamp(new Date());
+      await sendLogEmbed(client, OFFER_CHANNEL_ID, embed);
+    }
   } catch (error) {
     console.error("Offer expiry checker failed:", error.message);
     logError("offer_expiry_interval", error).catch(() => {});
@@ -1564,6 +1600,73 @@ client.on("interactionCreate", async (interaction) => {
       pricesPayload.offer = { discountPercent: 0, durationText: "", endsAt: null, expiredNotified: true };
       writePrices(pricesPayload);
       await safeReply(interaction, { content: "Offer disabled." });
+      return;
+    }
+
+    if (slashCommand === "weboffer") {
+      const rawPct = interaction.options.getString("porcentaje", true).replace("%", "").trim();
+      const durRaw = interaction.options.getString("duracion", true).trim();
+      const customMsg = interaction.options.getString("mensaje") || null;
+      const anunciar = interaction.options.getString("anunciar", true) === "si";
+      const everyone = interaction.options.getString("everyone", true) === "si";
+
+      const pct = Number(rawPct);
+      if (!Number.isFinite(pct) || pct === 0) {
+        await safeReply(interaction, { content: "Porcentaje inválido. Usa ej: -30 o +10" });
+        return;
+      }
+      const durationMs = parseDurationToMs(durRaw);
+      if (!durationMs) {
+        await safeReply(interaction, { content: "Duración inválida. Usa ej: 1h, 5d, 2w" });
+        return;
+      }
+
+      const endsAt = new Date(Date.now() + durationMs).toISOString();
+      const endUnix = Math.floor((Date.now() + durationMs) / 1000);
+      const isDiscount = pct < 0;
+      const absPct = Math.abs(pct);
+
+      const pricesPayload = readPrices();
+      pricesPayload.offer = {
+        discountPercent: isDiscount ? absPct : -absPct, // negative = increase, positive = discount
+        durationText: durRaw,
+        endsAt,
+        expiredNotified: false,
+        customMessage: customMsg,
+        announcedChannel: anunciar ? "1502048947001102546" : null,
+        isWebOffer: true
+      };
+      writePrices(pricesPayload);
+
+      const offerLabel = isDiscount ? `🔥 -${absPct}% DESCUENTO` : `📈 +${absPct}% AUMENTO DE PRECIO`;
+      const msgBody = customMsg
+        ? customMsg
+        : isDiscount
+          ? `⚡ Oferta limitada activa: **${absPct}% de descuento** en todos los planes. Aprovéchala antes de que acabe!`
+          : `📊 Precios actualizados: +${absPct}% en todos los planes.`;
+
+      if (anunciar) {
+        const OFFER_WEB_CHANNEL = "1502048947001102546";
+        try {
+          const ch = await client.channels.fetch(OFFER_WEB_CHANNEL);
+          if (ch && ch.isTextBased()) {
+            const embed = new EmbedBuilder()
+              .setColor(isDiscount ? 0x22c55e : 0xe85822)
+              .setTitle(offerLabel)
+              .setDescription(`${msgBody}\n\n⏳ **Termina:** <t:${endUnix}:R> (<t:${endUnix}:F>)`)
+              .setFooter({ text: "Falcao External • Oferta limitada" })
+              .setTimestamp();
+            const content = everyone ? "@everyone" : "";
+            await ch.send({ content, embeds: [embed] });
+          }
+        } catch (e) {
+          console.error("[weboffer] announce error:", e.message);
+        }
+      }
+
+      await safeReply(interaction, {
+        content: `✅ Oferta web activada: **${pct > 0 ? "+" : ""}${pct}%** durante **${durRaw}**${anunciar ? " · Anunciado en el canal" : ""}.\nLos precios en la web ahora muestran el precio original tachado con el nuevo precio.`
+      });
       return;
     }
 
