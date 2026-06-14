@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#111318" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png" />
+  <link rel="preconnect" href="https://i.imgur.com" />
+  <title>Falcao Remote Panel</title>
+  <style>
+    :root { --bg:#0f1116; --card:#171a22; --stroke:#2a3040; --text:#eef1f7; --muted:#9aa3b5; --accent:#ff8a33; --accent-dim:rgba(255,138,51,.14); --ok:#3ecf6a; --err:#ff5d5d; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,Segoe UI,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; }
+    .hidden { display:none !important; }
+    .app { max-width:860px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column; }
+    .top { padding:14px 14px 8px; border-bottom:1px solid var(--stroke); background:linear-gradient(180deg,#141820,#12151c); position:sticky; top:0; z-index:10; }
+    .top-nav { display:flex; gap:8px; margin-bottom:10px; }
+    .top-nav a { text-decoration:none; font-size:.78rem; font-weight:600; padding:6px 12px; border-radius:999px; border:1px solid var(--stroke); color:var(--muted); transition:border-color .15s,color .15s; }
+    .top-nav a:hover { border-color:var(--accent); color:var(--accent); }
+    .brand { display:flex; gap:10px; align-items:center; }
+    .brand img { width:56px; height:56px; border-radius:12px; object-fit:contain; }
+    .brand h1 { margin:0; font-size:1rem; }
+    .brand p { margin:2px 0 0; color:var(--muted); font-size:.78rem; }
+    .status-row { display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:.85rem; }
+    .dot { width:9px; height:9px; border-radius:50%; background:var(--err); display:inline-block; margin-left:6px; }
+    .dot.on { background:var(--ok); box-shadow:0 0 8px rgba(62,207,106,.5); }
+    .login { padding:16px; }
+    .card { background:var(--card); border:1px solid var(--stroke); border-radius:14px; padding:14px; margin-bottom:12px; }
+    label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; }
+    input, select, button { font:inherit; }
+    input[type=text], input[type=password], input[type=number], input[type=range], select, textarea {
+      width:100%; padding:11px 12px; border-radius:12px; border:1px solid var(--stroke); background:#0d1017; color:var(--text);
+      font-size:16px;
+    }
+    textarea { min-height:140px; resize:vertical; font-family:Consolas,monospace; }
+    .num-wrap { display:flex; flex-direction:column; gap:6px; min-width:130px; align-items:stretch; }
+    .num-wrap input[type=range] { padding:0; height:28px; }
+    .num-wrap input[type=text] { width:100%; padding:8px 10px; text-align:center; }
+    .list-row { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+    .list-row:last-child { border-bottom:0; }
+    .list-meta { font-size:.75rem; color:var(--muted); }
+    .row-btns { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .row-btns button { padding:7px 10px; font-size:.75rem; }
+    button { border:0; border-radius:12px; padding:11px 14px; font-weight:600; background:var(--accent); color:#111; cursor:pointer; }
+    button.secondary { background:#252b39; color:var(--text); }
+    button.ghost { background:transparent; border:1px solid var(--stroke); color:var(--muted); }
+    button.full { width:100%; }
+    .msg { font-size:.84rem; color:var(--muted); margin-top:8px; }
+    .msg.err { color:var(--err); }
+    .layout { display:flex; flex:1; min-height:0; }
+    .sidebar { width:118px; border-right:1px solid var(--stroke); background:#12151c; overflow-y:auto; padding:8px 6px 80px; flex-shrink:0; }
+    .cat-title { font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding:8px 6px 4px; }
+    .nav-btn { width:100%; text-align:left; background:transparent; color:var(--muted); border:0; border-radius:10px; padding:8px 8px; font-size:.78rem; margin-bottom:4px; }
+    .nav-btn.active { background:var(--accent-dim); color:var(--accent); }
+    .main { flex:1; overflow-y:auto; padding:12px 12px 90px; }
+    .section-title { font-size:1rem; color:var(--accent); margin:0 0 10px; }
+    .group-title { font-size:.86rem; color:var(--text); margin:0 0 8px; opacity:.9; }
+    .option { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+    .option:last-child { border-bottom:0; }
+    .option label { margin:0; color:var(--text); font-size:.86rem; flex:1; }
+    .switch { position:relative; width:46px; height:26px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; inset:0; background:#303748; border-radius:999px; transition:.2s; }
+    .slider:before { content:""; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .switch input:checked + .slider { background:var(--accent); }
+    .switch input:checked + .slider:before { transform:translateX(20px); }
+    .toggle-btns { display:flex; gap:6px; flex-shrink:0; }
+    .toggle-btns button { padding:7px 12px; font-size:.75rem; min-width:72px; }
+    .toggle-btns button.on { background:var(--accent); color:#111; }
+    .toggle-btns button.off { background:#252b39; color:var(--text); }
+    .num { width:100%; padding:8px 10px; font-size:16px; border-radius:10px; border:1px solid var(--stroke); background:#0d1017; color:var(--text); }
+    .bottom { position:fixed; left:0; right:0; bottom:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(10,12,16,.96); border-top:1px solid var(--stroke); display:flex; gap:8px; justify-content:center; }
+    .note { color:var(--muted); font-size:.82rem; line-height:1.4; }
+    .cloud-badge { display:inline-block; font-size:.68rem; background:var(--accent-dim); color:var(--accent); padding:3px 8px; border-radius:999px; margin-top:6px; }
+    .rgba-wrap { display:flex; flex-direction:column; gap:8px; flex:1; min-width:160px; align-items:stretch; }
+    .rgba-row { display:flex; gap:8px; align-items:center; }
+    .rgba-row input[type=color] { width:52px; height:40px; padding:2px; border:1px solid var(--stroke); border-radius:10px; background:#0d1017; cursor:pointer; }
+    .rgba-row input[type=range] { flex:1; }
+    .rgba-alpha { font-size:.75rem; color:var(--muted); text-align:center; }
+    .bind-btn { min-width:110px; padding:8px 12px; font-size:.78rem; }
+    .bind-btn.waiting { background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent); }
+    .visual-mirror-overlay { position:fixed; inset:0; z-index:200; background:#000; display:flex; align-items:center; justify-content:center; }
+    .visual-mirror-overlay img { width:100%; height:100%; object-fit:cover; display:block; background:#000; }
+    .visual-mirror-exit { position:fixed; top:calc(12px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:210; padding:12px 20px; font-size:.9rem; box-shadow:0 4px 24px rgba(0,0,0,.6); }
+    .visual-mirror-hint { position:fixed; bottom:calc(72px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:210; color:var(--muted); font-size:.78rem; text-align:center; padding:0 16px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="top">
+      <div class="top-nav">
+        <a href="/">← Inicio</a>
+        <a href="/showcase">Showcase</a>
+      </div>
+      <div class="brand">
+        <img src="https://i.imgur.com/0nTvfnO.png" alt="Falcao" width="128" height="128" loading="eager" decoding="async" style="width:56px;height:56px;object-fit:contain;border-radius:12px" />
+        <div>
+          <h1>Falcao Remote Panel</h1>
+          <p>Panel en la nube — control remoto de tu PC</p>
+          <span class="cloud-badge">No es archivo local · Conexion via bot</span>
+        </div>
+      </div>
+      <div id="statusRow" class="status-row hidden">
+        <span id="keyMasked">—</span>
+        <span><span id="onlineLabel">Offline</span><span id="onlineDot" class="dot"></span></span>
+      </div>
+    </div>
+
+    <section id="loginView" class="login">
+      <div class="card">
+        <label for="licenseKey">License Key</label>
+        <input id="licenseKey" type="text" placeholder="FALCAO-EXTERNAL-XXXXXX-XXXXXXX" autocomplete="off" />
+        <button id="loginBtn" class="full" type="button" style="margin-top:12px">Conectar panel</button>
+        <p id="loginMsg" class="msg"></p>
+        <p class="note" style="margin-top:10px">El panel es una <strong>web en la nube</strong> (no guardes ni abras archivos HTML locales).<br>1) Ejecuta el external en tu PC y haz login.<br>2) Abre esta misma URL en el movil con tu key.<br>3) El juego recibe clicks normalmente — el menu no bloquea.</p>
+      </div>
+    </section>
+
+    <section id="panelView" class="hidden" style="flex:1;display:flex;flex-direction:column;min-height:0">
+      <div class="card" style="margin:10px 12px 0">
+        <div class="group-title">Modo visual en movil</div>
+        <p class="note" style="margin:0 0 10px">Pantalla negra en el movil con los visuals del juego (ESP, FOV, etc.) desde tu PC.</p>
+        <div class="option" style="border:0;padding:0">
+          <label>Activar modo visual</label>
+          <div id="visualMirrorToggle"></div>
+        </div>
+      </div>
+      <div class="card" style="margin:10px 12px 0">
+        <div class="group-title">Configs</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="configSelect" style="flex:1;min-width:120px"></select>
+          <button class="secondary" id="loadConfigBtn" type="button">Cargar</button>
+          <button class="secondary" id="saveConfigBtn" type="button">Guardar</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="newConfigName" type="text" placeholder="Nuevo nombre config" style="flex:1" />
+          <button class="ghost" id="saveAsConfigBtn" type="button">Guardar como</button>
+        </div>
+      </div>
+      <div class="layout">
+        <nav class="sidebar" id="sidebar"></nav>
+        <main class="main" id="mainPanel"></main>
+      </div>
+    </section>
+  </div>
+
+  <div id="visualMirrorOverlay" class="visual-mirror-overlay hidden">
+    <img id="visualMirrorImg" alt="Visuals PC" />
+    <button type="button" id="visualMirrorExitBtn" class="visual-mirror-exit">Desactivar modo visual</button>
+    <p class="visual-mirror-hint">Pantalla negra — solo se muestran los visuals del external</p>
+  </div>
+
+  <div class="bottom hidden" id="bottomBar">
+    <button class="secondary" id="refreshBtn" type="button">Actualizar</button>
+    <button class="ghost" id="logoutBtn" type="button">Salir</button>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "falcao_panel_token";
+    const LANG = "es";
+    let webToken = localStorage.getItem(STORAGE_KEY) || "";
+    let schema = null;
+    let stateMap = new Map();
+    let liveMeta = {};
+    let activeSection = 0;
+    let pollTimer = null;
+    let pollFailCount = 0;
+    let schemaCached = false;
+    let selectedPlayerNetId = null;
+    let visualMirrorOn = false;
+    let visualFrameTimer = null;
+    let visualFrameUrl = null;
+    let pendingBindKey = null;
+    const pendingUntil = new Map();
+    let rgbaDebounceTimer = null;
+    const rgbaPendingBatch = new Map();
+
+    const VK_LABELS = {
+      0:"None",1:"Mouse 1",2:"Mouse 2",4:"Mouse 3",5:"Mouse 4",6:"Mouse 5",
+      8:"Back",9:"Tab",13:"Enter",16:"Shift",17:"Ctrl",18:"Menu",27:"Escape",32:"Space",
+      37:"Left",38:"Up",39:"Right",40:"Down",45:"Insert",46:"Delete",
+      112:"F1",113:"F2",114:"F3",115:"F4",116:"F5",117:"F6",118:"F7",119:"F8",120:"F9",121:"F10",122:"F11",123:"F12"
+    };
+
+    function vkLabel(vk) {
+      const n = parseInt(vk, 10) || 0;
+      if (VK_LABELS[n]) return VK_LABELS[n];
+      if (n >= 65 && n <= 90) return String.fromCharCode(n);
+      if (n >= 48 && n <= 57) return String.fromCharCode(n);
+      return "VK " + n;
+    }
+
+    function channelKey(prefix, idx) { return prefix + idx; }
+
+    function float01(key, fallback) {
+      const v = parseFloat(getValue(key, fallback));
+      return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback;
+    }
+
+    function floatToHex(r, g, b) {
+      const h = (x) => Math.round(x * 255).toString(16).padStart(2, "0");
+      return "#" + h(r) + h(g) + h(b);
+    }
+
+    function hexToFloats(hex) {
+      const h = hex.replace("#", "");
+      if (h.length < 6) return [1, 1, 1];
+      return [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255];
+    }
+
+    const TX_ROWS_ES = ["Modo jugador", "Teleport", "Spawn vehiculo", "Curar", "Anuncio", "Reset world", "Player IDs"];
+    const TX_ROWS = ["Player Mode", "Teleport", "Vehicle Spawn", "Heal", "Announcement", "Reset World", "Player IDs"];
+    const TX_MODES = ["NoClip", "Godmode", "Beast Jump"];
+
+    async function api(path, options = {}) {
+      const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+      if (webToken) headers["x-panel-web-token"] = webToken;
+      const res = await fetch(path, Object.assign({}, options, { headers }));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Error de conexion");
+      return data;
+    }
+
+    function t(obj) { return (obj && (obj[LANG] || obj.en)) || ""; }
+
+    function showPanel(show) {
+      document.getElementById("loginView").classList.toggle("hidden", show);
+      document.getElementById("panelView").classList.toggle("hidden", !show);
+      document.getElementById("bottomBar").classList.toggle("hidden", !show);
+      document.getElementById("statusRow").classList.toggle("hidden", !show);
+      if (show) document.getElementById("panelView").style.display = "flex";
+    }
+
+    function setLoginMsg(text, err) {
+      const el = document.getElementById("loginMsg");
+      el.textContent = text || "";
+      el.className = "msg" + (err ? " err" : "");
+    }
+
+    function defaultForEntry(entry) {
+      if (entry.kind === "bool") return false;
+      if (entry.kind === "float") {
+        if (entry.key === "exp_player_scale") return 1;
+        return entry.min != null ? entry.min : 0;
+      }
+      return entry.min != null ? entry.min : 0;
+    }
+
+    function rebuildStateMap(items) {
+      const next = new Map();
+      const now = Date.now();
+      for (const it of items || []) {
+        const pending = pendingUntil.get(it.name);
+        if (pending && pending > now) {
+          const cur = stateMap.get(it.name);
+          if (cur) { next.set(it.name, cur); continue; }
+        }
+        next.set(it.name, it);
+      }
+      for (const [k, v] of stateMap.entries()) {
+        if (!next.has(k) && pendingUntil.get(k) > now) next.set(k, v);
+      }
+      stateMap = next;
+    }
+
+    function getValue(key, fallback) {
+      const it = stateMap.get(key);
+      return it ? it.value : fallback;
+    }
+
+    function markPending(name, ms = 2800) {
+      pendingUntil.set(name, Date.now() + ms);
+    }
+
+    function isDynamicSectionActive() {
+      const sec = schema && schema.sections.find(s => s.id === activeSection);
+      return !!(sec && sec.dynamic);
+    }
+
+    async function loadSchema() {
+      if (schemaCached && schema) return;
+      const data = await api("/api/panel/schema");
+      schema = data.schema;
+      schemaCached = true;
+    }
+
+    function renderSidebar() {
+      const nav = document.getElementById("sidebar");
+      nav.innerHTML = "";
+      for (const cat of schema.categories) {
+        const title = document.createElement("div");
+        title.className = "cat-title";
+        title.textContent = t(cat);
+        nav.appendChild(title);
+        for (const sid of cat.sections) {
+          const sec = schema.sections.find(s => s.id === sid);
+          if (!sec) continue;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "nav-btn" + (activeSection === sid ? " active" : "");
+          btn.textContent = t(sec);
+          btn.onclick = () => { activeSection = sid; renderSidebar(); renderSection(); };
+          nav.appendChild(btn);
+        }
+      }
+    }
+
+    async function sendCommand(command) {
+      await api("/api/panel/web/command", { method:"POST", body: JSON.stringify(command) });
+    }
+
+    function renderDynamicSection(sec) {
+      const main = document.getElementById("mainPanel");
+      main.innerHTML = "";
+      const h = document.createElement("h2");
+      h.className = "section-title";
+      h.textContent = t(sec);
+      main.appendChild(h);
+
+      if (sec.dynamic === "resources") {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<div class="note">${liveMeta.resourceStatus || "Escaneando resources..."}</div>`;
+        main.appendChild(card);
+        const listCard = document.createElement("div");
+        listCard.className = "card";
+        for (const r of liveMeta.resources || []) {
+          const row = document.createElement("div");
+          row.className = "list-row";
+          row.innerHTML = `<div><div>${r.path}</div><div class="list-meta">${r.state}</div></div>`;
+          const btns = document.createElement("div");
+          btns.className = "row-btns";
+          const stop = document.createElement("button");
+          stop.className = "secondary";
+          stop.type = "button";
+          stop.textContent = "Stop";
+          stop.onclick = async () => {
+            try { await sendCommand({ type:"stop_resource", pointer: r.pointer }); } catch(e){ alert(e.message); }
+          };
+          btns.appendChild(stop);
+          row.appendChild(btns);
+          listCard.appendChild(row);
+        }
+        main.appendChild(listCard);
+        return;
+      }
+
+      if (sec.dynamic === "list") {
+        const pCard = document.createElement("div");
+        pCard.className = "card";
+        pCard.innerHTML = `<div class="group-title">Jugadores cercanos</div>`;
+        for (const p of liveMeta.players || []) {
+          const row = document.createElement("div");
+          row.className = "list-row";
+          const selected = selectedPlayerNetId === p.netId;
+          row.innerHTML = `<div><div>${p.name}${p.isFriend ? " [FRIEND]" : ""}${selected ? " ✓" : ""}</div><div class="list-meta">NetID: ${p.netId} · ${p.distance}m</div></div>`;
+          const btns = document.createElement("div");
+          btns.className = "row-btns";
+          const sel = document.createElement("button");
+          sel.className = "ghost";
+          sel.type = "button";
+          sel.textContent = "Sel.";
+          sel.onclick = () => { selectedPlayerNetId = p.netId; renderSection(); };
+          btns.appendChild(sel);
+          if (p.netId >= 0) {
+            [["Tasear", { type:"player_taze", netId:p.netId }], ["Amigo", { type:"player_friend_add", netId:p.netId }], ["Quitar amigo", { type:"player_friend_remove", netId:p.netId }], ["Outfit", { type:"player_copy_outfit", netId:p.netId }]].forEach(([label, cmd]) => {
+              const b = document.createElement("button");
+              b.className = "secondary";
+              b.type = "button";
+              b.textContent = label;
+              b.onclick = async () => { try { await sendCommand(cmd); } catch(e){ alert(e.message); } };
+              btns.appendChild(b);
+            });
+          }
+          row.appendChild(btns);
+          pCard.appendChild(row);
+        }
+        main.appendChild(pCard);
+
+        const vCard = document.createElement("div");
+        vCard.className = "card";
+        vCard.innerHTML = `<div class="group-title">Vehiculos cercanos</div>`;
+        for (const v of liveMeta.vehicles || []) {
+          const row = document.createElement("div");
+          row.className = "list-row";
+          row.innerHTML = `<div><div>${v.name}</div><div class="list-meta">${v.distance}m · idx ${v.index}</div></div>`;
+          vCard.appendChild(row);
+        }
+        main.appendChild(vCard);
+        return;
+      }
+
+      if (sec.dynamic === "lua") {
+        const card = document.createElement("div");
+        card.className = "card";
+        const status = liveMeta.lua || {};
+        card.innerHTML = `<div class="note">Hook: ${status.hookReady ? "listo" : "no listo"} · ${status.lastDetail || ""}</div>`;
+        const ta = document.createElement("textarea");
+        ta.id = "luaScript";
+        ta.placeholder = "Pega tu script .lua aqui...";
+        card.appendChild(ta);
+        const run = document.createElement("button");
+        run.className = "full";
+        run.type = "button";
+        run.style.marginTop = "10px";
+        run.textContent = "Ejecutar Lua";
+        run.onclick = async () => {
+          const script = ta.value.trim();
+          if (!script) return alert("Pega un script primero.");
+          run.disabled = true;
+          run.textContent = "Ejecutando...";
+          try {
+            await sendCommand({ type:"execute_lua", script });
+            alert("Script enviado. Si no pasa nada, entra al servidor y espera a spawnear.");
+          } catch(e){ alert(e.message); }
+          finally { run.disabled = false; run.textContent = "Ejecutar Lua"; }
+        };
+        card.appendChild(run);
+        main.appendChild(card);
+        return;
+      }
+
+      if (sec.dynamic === "txadmin") {
+        const tx = liveMeta.txadmin || {};
+        const card = document.createElement("div");
+        card.className = "card";
+        const rows = LANG === "es" ? TX_ROWS_ES : TX_ROWS;
+        card.innerHTML = `<div class="note">Menu TxAdmin: ${tx.menuOpen ? "ABIERTO" : "cerrado"} · Fila: ${rows[tx.selectedRow] || tx.selectedRow}</div>`;
+        const btns = document.createElement("div");
+        btns.className = "row-btns";
+        btns.style.marginTop = "10px";
+        [
+          ["Abrir/Cerrar menu", { type:"txadmin_toggle" }],
+          ["Subir", { type:"txadmin_row", delta:-1 }],
+          ["Bajar", { type:"txadmin_row", delta:1 }],
+          ["Activar fila", { type:"txadmin_activate" }]
+        ].forEach(([label, cmd]) => {
+          const b = document.createElement("button");
+          b.className = "secondary";
+          b.type = "button";
+          b.textContent = label;
+          b.onclick = async () => { try { await sendCommand(cmd); setTimeout(refreshStatus, 400); } catch(e){ alert(e.message); } };
+          btns.appendChild(b);
+        });
+        card.appendChild(btns);
+
+        const modeWrap = document.createElement("div");
+        modeWrap.style.marginTop = "12px";
+        modeWrap.innerHTML = `<label>Modo jugador (Player Mode)</label>`;
+        const modeSel = document.createElement("select");
+        TX_MODES.forEach((m, i) => {
+          const o = document.createElement("option");
+          o.value = i; o.textContent = m;
+          modeSel.appendChild(o);
+        });
+        modeSel.value = String(tx.playerMode || 0);
+        modeSel.onchange = async () => {
+          try {
+            await sendCommand({ type:"txadmin_player_mode", mode: parseInt(modeSel.value, 10) });
+          } catch(e){ alert(e.message); }
+        };
+        modeWrap.appendChild(modeSel);
+        card.appendChild(modeWrap);
+
+        const idsRow = document.createElement("div");
+        idsRow.className = "option";
+        idsRow.style.marginTop = "12px";
+        const idsLabel = document.createElement("label");
+        idsLabel.textContent = "Mostrar Player IDs";
+        idsRow.appendChild(idsLabel);
+        const idsBtns = document.createElement("div");
+        idsBtns.className = "toggle-btns";
+        const idsOn = document.createElement("button");
+        idsOn.type = "button";
+        idsOn.textContent = "Activado";
+        const idsOff = document.createElement("button");
+        idsOff.type = "button";
+        idsOff.textContent = "Desactivado";
+        const idsActive = !!tx.showPlayerIds;
+        idsOn.className = idsActive ? "on" : "off";
+        idsOff.className = idsActive ? "off" : "on";
+        idsOn.onclick = async () => {
+          try { await sendCommand({ type:"txadmin_show_ids", value: true }); setTimeout(refreshStatus, 400); } catch(e){ alert(e.message); }
+        };
+        idsOff.onclick = async () => {
+          try { await sendCommand({ type:"txadmin_show_ids", value: false }); setTimeout(refreshStatus, 400); } catch(e){ alert(e.message); }
+        };
+        idsBtns.appendChild(idsOn);
+        idsBtns.appendChild(idsOff);
+        idsRow.appendChild(idsBtns);
+        card.appendChild(idsRow);
+        main.appendChild(card);
+      }
+    }
+
+    function renderSection() {
+      const main = document.getElementById("mainPanel");
+      main.innerHTML = "";
+      const sec = schema.sections.find(s => s.id === activeSection);
+      if (!sec) return;
+      if (sec.dynamic) {
+        renderDynamicSection(sec);
+        return;
+      }
+      const h = document.createElement("h2");
+      h.className = "section-title";
+      h.textContent = t(sec);
+      main.appendChild(h);
+      for (const group of sec.groups) {
+        const card = document.createElement("div");
+        card.className = "card";
+        const gt = document.createElement("div");
+        gt.className = "group-title";
+        gt.textContent = t(group);
+        card.appendChild(gt);
+        for (const entry of group.items || []) {
+          if (entry.kind === "action") card.appendChild(renderAction(entry));
+          else if (entry.kind === "rgba") card.appendChild(renderRgba(entry));
+          else if (entry.kind === "bind") card.appendChild(renderBind(entry));
+          else card.appendChild(renderOption(entry));
+        }
+        main.appendChild(card);
+      }
+    }
+
+    function isBinaryToggle(entry) {
+      if (entry.kind === "bool") return true;
+      if (entry.kind === "int" && entry.max != null && entry.min != null && entry.max <= 1 && entry.min >= 0)
+        return true;
+      return false;
+    }
+
+    function renderToggleButtons(entry, currentValue) {
+      const wrap = document.createElement("div");
+      wrap.className = "toggle-btns";
+      const on = document.createElement("button");
+      on.type = "button";
+      on.textContent = "Activado";
+      const off = document.createElement("button");
+      off.type = "button";
+      off.textContent = "Desactivado";
+      const active = !!currentValue;
+      on.className = active ? "on" : "off";
+      off.className = active ? "off" : "on";
+      on.onclick = () => setOption(entry.key, entry.kind === "bool" ? true : 1);
+      off.onclick = () => setOption(entry.key, entry.kind === "bool" ? false : 0);
+      wrap.appendChild(on);
+      wrap.appendChild(off);
+      return wrap;
+    }
+
+    function renderAction(entry) {
+      const row = document.createElement("div");
+      row.className = "option";
+      const label = document.createElement("label");
+      label.textContent = t(entry.label);
+      const btn = document.createElement("button");
+      btn.className = "secondary";
+      btn.type = "button";
+      btn.textContent = entry.command && entry.command.type === "unload" ? "Unload" : (entry.command && entry.command.type === "bypass" ? "Bypass" : "Ejecutar");
+      btn.onclick = async () => {
+        try { await sendCommand(entry.command); } catch (e) { alert(e.message); }
+      };
+      row.appendChild(label);
+      row.appendChild(btn);
+      return row;
+    }
+
+    function renderRgba(entry) {
+      const row = document.createElement("div");
+      row.className = "option";
+      const label = document.createElement("label");
+      label.textContent = t(entry.label);
+      row.appendChild(label);
+      const prefix = entry.key;
+      const r = float01(channelKey(prefix, 0), 1);
+      const g = float01(channelKey(prefix, 1), 1);
+      const b = float01(channelKey(prefix, 2), 1);
+      const a = float01(channelKey(prefix, 3), 1);
+      const wrap = document.createElement("div");
+      wrap.className = "rgba-wrap";
+      const rgbRow = document.createElement("div");
+      rgbRow.className = "rgba-row";
+      const picker = document.createElement("input");
+      picker.type = "color";
+      picker.value = floatToHex(r, g, b);
+      picker.oninput = () => {
+        const [nr, ng, nb] = hexToFloats(picker.value);
+        queueRgbaUpdate(channelKey(prefix, 0), nr);
+        queueRgbaUpdate(channelKey(prefix, 1), ng);
+        queueRgbaUpdate(channelKey(prefix, 2), nb);
+      };
+      rgbRow.appendChild(picker);
+      const alpha = document.createElement("input");
+      alpha.type = "range";
+      alpha.min = 0; alpha.max = 1; alpha.step = 0.01; alpha.value = a;
+      const alphaLbl = document.createElement("div");
+      alphaLbl.className = "rgba-alpha";
+      alphaLbl.textContent = "Alpha " + Math.round(a * 100) + "%";
+      alpha.oninput = () => {
+        alphaLbl.textContent = "Alpha " + Math.round(parseFloat(alpha.value) * 100) + "%";
+        queueRgbaUpdate(channelKey(prefix, 3), parseFloat(alpha.value));
+      };
+      rgbRow.appendChild(alpha);
+      wrap.appendChild(rgbRow);
+      wrap.appendChild(alphaLbl);
+      row.appendChild(wrap);
+      return row;
+    }
+
+    function renderBind(entry) {
+      const row = document.createElement("div");
+      row.className = "option";
+      const label = document.createElement("label");
+      label.textContent = t(entry.label);
+      row.appendChild(label);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "secondary bind-btn";
+      const vk = parseInt(getValue(entry.key, 0), 10) || 0;
+      const waiting = pendingBindKey === entry.key;
+      btn.textContent = waiting ? "Pulsa tecla en PC..." : vkLabel(vk);
+      if (waiting) btn.classList.add("waiting");
+      btn.onclick = async () => {
+        try {
+          pendingBindKey = entry.key;
+          renderSection();
+          await sendCommand({ type: "capture_bind", name: entry.key });
+        } catch (e) { pendingBindKey = null; alert(e.message); renderSection(); }
+      };
+      row.appendChild(btn);
+      return row;
+    }
+
+    function renderOption(entry) {
+      const row = document.createElement("div");
+      row.className = "option";
+      const label = document.createElement("label");
+      label.textContent = t(entry.label);
+      row.appendChild(label);
+      const val = getValue(entry.key, defaultForEntry(entry));
+      if (entry.key === "exp_player_scale") {
+        const scaleRow = document.createElement("div");
+        scaleRow.className = "option";
+        const scaleLabel = document.createElement("label");
+        scaleLabel.textContent = t(entry.label);
+        scaleRow.appendChild(scaleLabel);
+        const min = entry.min != null ? entry.min : 0.1;
+        const max = entry.max != null ? entry.max : 5;
+        const step = entry.step || 0.05;
+        const wrap = document.createElement("div");
+        wrap.className = "num-wrap";
+        const range = document.createElement("input");
+        range.type = "range";
+        range.min = min; range.max = max; range.step = step;
+        range.value = parseFloat(val) || 1;
+        const text = document.createElement("input");
+        text.type = "text";
+        text.inputMode = "decimal";
+        text.value = (parseFloat(val) || 1).toFixed(2) + "x";
+        const applyScale = (raw) => {
+          const v = parseFloat(raw);
+          if (Number.isNaN(v)) return;
+          const clamped = Math.min(max, Math.max(min, v));
+          text.value = clamped.toFixed(2) + "x";
+          range.value = clamped;
+          markPending("exp_player_scale");
+          setOption("exp_player_scale", clamped);
+        };
+        range.oninput = () => applyScale(range.value);
+        text.onchange = () => applyScale(text.value.replace(/x$/i, ""));
+        wrap.appendChild(range);
+        wrap.appendChild(text);
+        scaleRow.appendChild(wrap);
+        return scaleRow;
+      }
+      if (isBinaryToggle(entry)) {
+        row.appendChild(renderToggleButtons(entry, val));
+      } else if (entry.options) {
+        const sel = document.createElement("select");
+        sel.className = "num";
+        const opts = entry.options[LANG] || entry.options.en || [];
+        opts.forEach((text, idx) => {
+          const o = document.createElement("option");
+          o.value = idx;
+          o.textContent = text;
+          sel.appendChild(o);
+        });
+        sel.value = String(parseInt(val, 10) || 0);
+        sel.onchange = () => setOption(entry.key, parseInt(sel.value, 10));
+        row.appendChild(sel);
+      } else {
+        const wrap = document.createElement("div");
+        wrap.className = "num-wrap";
+        const min = entry.min != null ? entry.min : 0;
+        const max = entry.max != null ? entry.max : (entry.kind === "float" ? 100 : 1000);
+        const step = entry.step || (entry.kind === "float" ? 0.01 : 1);
+        const range = document.createElement("input");
+        range.type = "range";
+        range.min = min; range.max = max; range.step = step; range.value = val;
+        const text = document.createElement("input");
+        text.type = "text";
+        text.inputMode = entry.kind === "float" ? "decimal" : "numeric";
+        text.value = val;
+        const apply = (raw) => {
+          const v = entry.kind === "float" ? parseFloat(raw) : parseInt(raw, 10);
+          if (Number.isNaN(v)) return;
+          const clamped = Math.min(max, Math.max(min, v));
+          text.value = clamped;
+          range.value = clamped;
+          setOption(entry.key, entry.kind === "float" ? clamped : Math.round(clamped));
+        };
+        range.oninput = () => apply(range.value);
+        text.onchange = () => apply(text.value);
+        text.onblur = () => apply(text.value);
+        wrap.appendChild(range);
+        wrap.appendChild(text);
+        row.appendChild(wrap);
+      }
+      return row;
+    }
+
+    function localTypeFor(value) {
+      if (typeof value === "boolean") return "bool";
+      if (Number.isInteger(value)) return "int";
+      return "float";
+    }
+
+    function applyLocalOption(name, value) {
+      const local = stateMap.get(name) || { name, type: localTypeFor(value) };
+      local.value = value;
+      stateMap.set(name, local);
+      markPending(name);
+    }
+
+    async function setOptionsBatch(items) {
+      for (const it of items) applyLocalOption(it.name, it.value);
+      try {
+        await sendCommand({ type: "bulk_options", items });
+      } catch (e) { alert(e.message); }
+    }
+
+    function flushRgbaBatch() {
+      if (!rgbaPendingBatch.size) return;
+      const items = [];
+      for (const [name, value] of rgbaPendingBatch.entries()) {
+        applyLocalOption(name, value);
+        items.push({ name, value });
+      }
+      rgbaPendingBatch.clear();
+      sendCommand({ type: "bulk_options", items }).catch(e => alert(e.message));
+    }
+
+    function queueRgbaUpdate(name, value) {
+      rgbaPendingBatch.set(name, value);
+      clearTimeout(rgbaDebounceTimer);
+      rgbaDebounceTimer = setTimeout(flushRgbaBatch, 120);
+    }
+
+    async function setOption(name, value) {
+      applyLocalOption(name, value);
+      try {
+        await sendCommand({ type:"option", name, value });
+      } catch (e) { alert(e.message); }
+    }
+
+    async function configAction(action, configName) {
+      if (!configName) return alert("Nombre de config requerido");
+      await sendCommand({ type: action, configName });
+      setTimeout(refreshStatus, 900);
+    }
+
+    function renderVisualMirrorToggle() {
+      const host = document.getElementById("visualMirrorToggle");
+      if (!host) return;
+      host.innerHTML = "";
+      host.appendChild(renderToggleButtons(
+        { key: "visual_mirror", kind: "bool" },
+        visualMirrorOn
+      ));
+      const wrap = host.querySelector(".toggle-btns");
+      if (!wrap) return;
+      const [onBtn, offBtn] = wrap.querySelectorAll("button");
+      onBtn.onclick = () => setVisualMirror(true);
+      offBtn.onclick = () => setVisualMirror(false);
+    }
+
+    async function setVisualMirror(on) {
+      visualMirrorOn = !!on;
+      try {
+        await sendCommand({ type: "mobile_visual_mirror", value: visualMirrorOn });
+      } catch (e) { alert(e.message); visualMirrorOn = !on; }
+      updateVisualMirrorOverlay();
+      renderVisualMirrorToggle();
+    }
+
+    async function fetchVisualFrame() {
+      if (!visualMirrorOn || !webToken) return;
+      try {
+        const res = await fetch("/api/panel/web/visual-frame", {
+          headers: { "x-panel-web-token": webToken }
+        });
+        if (res.status === 204 || !res.ok) return;
+        const blob = await res.blob();
+        const img = document.getElementById("visualMirrorImg");
+        if (!img) return;
+        const nextUrl = URL.createObjectURL(blob);
+        if (visualFrameUrl) URL.revokeObjectURL(visualFrameUrl);
+        visualFrameUrl = nextUrl;
+        img.src = nextUrl;
+      } catch (_) {}
+    }
+
+    function startVisualFramePoll() {
+      if (visualFrameTimer) clearInterval(visualFrameTimer);
+      if (!visualMirrorOn) return;
+      fetchVisualFrame();
+      visualFrameTimer = setInterval(fetchVisualFrame, 220);
+    }
+
+    function stopVisualFramePoll() {
+      if (visualFrameTimer) clearInterval(visualFrameTimer);
+      visualFrameTimer = null;
+      if (visualFrameUrl) {
+        URL.revokeObjectURL(visualFrameUrl);
+        visualFrameUrl = null;
+      }
+    }
+
+    function updateVisualMirrorOverlay() {
+      const overlay = document.getElementById("visualMirrorOverlay");
+      const img = document.getElementById("visualMirrorImg");
+      const panel = document.getElementById("panelView");
+      if (!overlay || !img) return;
+      overlay.classList.toggle("hidden", !visualMirrorOn);
+      if (panel) panel.classList.toggle("hidden", visualMirrorOn);
+      document.getElementById("bottomBar").classList.toggle("hidden", !webToken || visualMirrorOn);
+      if (visualMirrorOn) startVisualFramePoll();
+      else {
+        stopVisualFramePoll();
+        img.removeAttribute("src");
+      }
+    }
+
+    function handleBindCaptureMeta() {
+      const bc = liveMeta.bindCapture || {};
+      if (bc.capturedVk != null && bc.name) {
+        const local = stateMap.get(bc.name) || { name: bc.name, type: "int" };
+        local.value = bc.capturedVk;
+        stateMap.set(bc.name, local);
+        pendingBindKey = null;
+        renderSection();
+      } else if (!bc.active && pendingBindKey && !bc.capturedVk) {
+        /* still waiting */
+      } else if (!bc.active && pendingBindKey) {
+        pendingBindKey = null;
+      }
+    }
+
+    async function refreshStatus() {
+      const data = await api("/api/panel/web/status");
+      pollFailCount = 0;
+      document.getElementById("keyMasked").textContent = data.keyMasked || "—";
+      const online = !!data.clientOnline;
+      document.getElementById("onlineDot").classList.toggle("on", online);
+      document.getElementById("onlineLabel").textContent = online ? "Online" : "Offline";
+      rebuildStateMap((data.state && data.state.items) || []);
+      liveMeta = (data.state && data.state.meta) || {};
+      if (liveMeta.visualMirror) visualMirrorOn = !!liveMeta.visualMirror.active;
+      handleBindCaptureMeta();
+      updateVisualMirrorOverlay();
+      renderVisualMirrorToggle();
+      const configs = (data.state && data.state.meta && data.state.meta.configs) || [];
+      const sel = document.getElementById("configSelect");
+      const cur = sel.value;
+      sel.innerHTML = "";
+      for (const name of configs) {
+        const opt = document.createElement("option");
+        opt.value = name; opt.textContent = name;
+        sel.appendChild(opt);
+      }
+      if (cur && configs.includes(cur)) sel.value = cur;
+      if (pendingBindKey) {
+        renderSection();
+      } else if (isDynamicSectionActive()) {
+        renderSection();
+      }
+    }
+
+    async function login() {
+      const key = document.getElementById("licenseKey").value.trim();
+      if (!key) return setLoginMsg("Introduce tu key.", true);
+      setLoginMsg("Conectando...");
+      try {
+        await loadSchema();
+        const data = await api("/api/panel/web/login", { method:"POST", body: JSON.stringify({ key }) });
+        webToken = data.webToken;
+        localStorage.setItem(STORAGE_KEY, webToken);
+        setLoginMsg("");
+        showPanel(true);
+        renderSidebar();
+        renderVisualMirrorToggle();
+        renderSection();
+        await refreshStatus();
+        startPolling();
+      } catch (e) {
+        setLoginMsg(e.message, true);
+      }
+    }
+
+    function pollInterval() {
+      if (visualMirrorOn) return 1200;
+      return document.hidden ? 5000 : 2000;
+    }
+
+    let pollTick = null;
+    let visibilityBound = false;
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTick = async () => {
+        try {
+          await refreshStatus();
+        } catch (e) {
+          pollFailCount += 1;
+          if (pollFailCount >= 8) {
+            setLoginMsg("Sesion perdida. Vuelve a conectar.", true);
+            await logout();
+          }
+        }
+      };
+      pollTimer = setInterval(pollTick, pollInterval());
+      if (!visibilityBound) {
+        visibilityBound = true;
+        document.addEventListener("visibilitychange", () => {
+          if (pollTimer) clearInterval(pollTimer);
+          pollTimer = setInterval(pollTick, pollInterval());
+        });
+      }
+    }
+
+    async function logout() {
+      if (visualMirrorOn) {
+        try { await sendCommand({ type: "mobile_visual_mirror", value: false }); } catch (_) {}
+        visualMirrorOn = false;
+        stopVisualFramePoll();
+        updateVisualMirrorOverlay();
+      }
+      try { await api("/api/panel/web/logout", { method:"POST", body:"{}" }); } catch (_) {}
+      webToken = "";
+      localStorage.removeItem(STORAGE_KEY);
+      if (pollTimer) clearInterval(pollTimer);
+      showPanel(false);
+    }
+
+    document.getElementById("loginBtn").onclick = login;
+    document.getElementById("logoutBtn").onclick = logout;
+    document.getElementById("refreshBtn").onclick = refreshStatus;
+    document.getElementById("loadConfigBtn").onclick = () => configAction("load_config", document.getElementById("configSelect").value);
+    document.getElementById("saveConfigBtn").onclick = () => configAction("save_config", document.getElementById("configSelect").value);
+    document.getElementById("saveAsConfigBtn").onclick = () => configAction("save_config", document.getElementById("newConfigName").value.trim());
+    document.getElementById("visualMirrorExitBtn").onclick = () => setVisualMirror(false);
+
+    (async function boot() {
+      if (!webToken) return;
+      let ok = false;
+      for (let i = 0; i < 4; i++) {
+        try {
+          await loadSchema();
+          await refreshStatus();
+          ok = true;
+          break;
+        } catch (_) {
+          await new Promise((r) => setTimeout(r, 800));
+        }
+      }
+      if (!ok) { showPanel(false); return; }
+      showPanel(true);
+      renderSidebar();
+      renderVisualMirrorToggle();
+      renderSection();
+      startPolling();
+    })();
+  </script>
+</body>
+</html>

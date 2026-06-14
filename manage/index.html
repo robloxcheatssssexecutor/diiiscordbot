@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="theme-color" content="#111318"/>
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png"/>
+  <title>Manage — Falcao External</title>
+  <style>
+    :root{--bg:#0a0b10;--card:#14161e;--card2:#1c1f2a;--stroke:#2a3040;--text:#eef1f7;--muted:#9aa3b5;--accent:#ff8a33;--ok:#3ecf6a;--err:#ff5d5d;--yellow:#eab308}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    #bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.28}
+    .nav{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--stroke);background:#0e1016;position:sticky;top:0;z-index:20}
+    .nav img{width:36px;height:36px;border-radius:8px;object-fit:contain}
+    .nav h1{margin:0;font-size:.95rem;flex:1}
+    .nav a,.nav button{text-decoration:none;font:inherit;border-radius:10px;padding:7px 13px;font-weight:600;cursor:pointer;border:1px solid var(--stroke);background:#1a1e28;color:var(--text);font-size:.82rem}
+    .nav a:hover,.nav button:hover{border-color:var(--accent);color:var(--accent)}
+    .wrap{max-width:1180px;margin:0 auto;padding:16px}
+    .card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:16px;margin-bottom:14px}
+    .hidden{display:none!important}
+    .login-box{max-width:400px;margin:60px auto;text-align:center}
+    .login-box img{width:64px;border-radius:14px;margin-bottom:14px;box-shadow:0 0 32px rgba(255,138,51,.25)}
+    .btn{border:0;border-radius:10px;padding:10px 15px;font-weight:600;cursor:pointer;font-family:inherit;font-size:.83rem;transition:opacity .15s,transform .12s}
+    .btn:hover{opacity:.85;transform:translateY(-1px)}
+    .btn.primary{background:var(--accent);color:#111}
+    .btn.secondary{background:var(--card2);color:var(--text);border:1px solid var(--stroke)}
+    .btn.danger{background:rgba(255,93,93,.12);color:var(--err);border:1px solid rgba(255,93,93,.3)}
+    .btn.ok-btn{background:rgba(62,207,106,.12);color:var(--ok);border:1px solid rgba(62,207,106,.3)}
+    .btn.sm{padding:5px 9px;font-size:.75rem}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+    input,select{padding:9px 12px;border-radius:10px;border:1px solid var(--stroke);background:#0d1017;color:var(--text);font:inherit;font-size:.83rem}
+    input[type=search]{flex:1;min-width:160px}
+    table{width:100%;border-collapse:collapse;font-size:.8rem}
+    th,td{padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.05);text-align:left;vertical-align:middle}
+    th{color:var(--muted);font-weight:500;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
+    .key-cell{font-family:Consolas,monospace;font-size:.76rem;word-break:break-all;max-width:220px}
+    .status-active{color:var(--ok)}
+    .status-expired{color:var(--err)}
+    .status-paused{color:var(--yellow)}
+    .msg{font-size:.82rem;color:var(--muted);margin-top:6px}
+    .msg.err{color:var(--err)}
+    .actions{display:flex;flex-wrap:wrap;gap:4px}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    /* MODAL */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+    .modal{background:var(--card);border:1px solid var(--stroke);border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0}
+    .modal-header h2{font-size:1rem;font-weight:700;margin:0}
+    .modal-close{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:4px 8px;border-radius:6px}
+    .modal-close:hover{color:var(--text);background:var(--card2)}
+    .modal-body{padding:16px 20px 20px}
+    .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .detail-item{background:var(--card2);border:1px solid var(--stroke);border-radius:10px;padding:10px 12px}
+    .detail-item .label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+    .detail-item .value{font-size:.83rem;word-break:break-all;font-family:Consolas,monospace}
+    .detail-item.full{grid-column:1/-1}
+    .modal-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+    .pagination{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:.82rem}
+    @media(max-width:700px){.detail-grid{grid-template-columns:1fr}.key-cell{max-width:120px}}
+  </style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<header class="nav">
+  <img src="https://i.imgur.com/lst2PVm.png" alt="logo"/>
+  <h1>Manage — Licencias</h1>
+  <a href="/">Inicio</a>
+  <a href="/account">Mi Cuenta</a>
+  <button type="button" id="logoutBtn" class="hidden">Salir</button>
+</header>
+
+<div class="wrap">
+  <!-- LOGIN -->
+  <section id="loginView" class="card login-box">
+    <img src="https://i.imgur.com/lst2PVm.png" alt="logo"/>
+    <h2 style="margin:0 0 8px">Panel Admin</h2>
+    <p class="msg">Solo administradores autorizados.</p>
+    <button class="btn primary" type="button" id="discordLoginBtn" style="background:#5865f2;color:#fff;margin-top:14px;width:100%">
+      Iniciar sesión con Discord
+    </button>
+    <p id="loginMsg" class="msg err" style="margin-top:8px"></p>
+  </section>
+
+  <!-- MANAGE -->
+  <section id="manageView" class="hidden">
+    <div class="card">
+      <div class="toolbar">
+        <input type="search" id="searchInput" placeholder="Buscar key, hwid, ip..."/>
+        <select id="filterStatus">
+          <option value="">Todos</option>
+          <option value="active">Activas</option>
+          <option value="expired">Expiradas</option>
+          <option value="paused">Pausadas</option>
+        </select>
+        <select id="createPlan"><option value="falcao">falcao</option><option value="temp">temp</option><option value="both">both</option></select>
+        <input type="number" id="createDays" value="30" min="1" style="width:72px" title="Días"/>
+        <button class="btn primary" type="button" id="createBtn">+ Crear</button>
+        <button class="btn secondary" type="button" id="refreshBtn">↻ Actualizar</button>
+      </div>
+      <p id="listMsg" class="msg"></p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Plan</th>
+              <th>Estado</th>
+              <th>Expira</th>
+              <th>Discord</th>
+              <th>IP</th>
+              <th>HWID</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="keysBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- SPENDING SECTION -->
+    <div class="card" style="margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span style="font-weight:600;font-size:.9rem">💰 Gasto por usuario</span>
+        <button class="btn sm secondary" type="button" id="refreshSpendingBtn">↻</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Usuario</th><th>Discord ID</th><th>Pedidos</th><th>Total gastado</th></tr></thead>
+          <tbody id="spendingBody"><tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- MODAL DETALLE -->
+<div class="modal-bg hidden" id="modalBg">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🔑 Detalle de Key</h2>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let currentPage=1;
+const LIMIT=50;
+
+async function api(path,opts={}){
+  const res=await fetch(path,Object.assign({headers:{"Content-Type":"application/json"}},opts));
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(data.message||"Error "+res.status);
+  return data;
+}
+
+function fmtDate(v){
+  if(!v)return "—";
+  return new Date(v).toLocaleString("es-ES",{dateStyle:"short",timeStyle:"short"});
+}
+function daysLeft(iso){
+  if(!iso)return null;
+  const diff=new Date(iso).getTime()-Date.now();
+  if(diff<=0)return 0;
+  return Math.ceil(diff/86400000);
+}
+function truncate(s,n=24){if(!s)return "—";return s.length>n?s.slice(0,n)+"…":s;}
+function statusClass(s){return{active:"status-active",expired:"status-expired",paused:"status-paused"}[s]||"";}
+function planBadge(p){const c={falcao:"#e85822",temp:"#5865f2",both:"#3ecf6a"}[p]||"#888";return `<span style="background:${c}22;color:${c};border:1px solid ${c}44;border-radius:999px;padding:2px 8px;font-size:.7rem;font-weight:700">${p}</span>`;}
+
+function showAuth(ok){
+  $("loginView").classList.toggle("hidden",ok);
+  $("manageView").classList.toggle("hidden",!ok);
+  $("logoutBtn").classList.toggle("hidden",!ok);
+}
+
+async function checkAuth(){
+  try{const d=await api("/api/manage/auth/status");showAuth(!!d.authenticated);if(d.authenticated){loadKeys();loadSpending();}}
+  catch(_){showAuth(false);}
+}
+
+async function loadKeys(page=currentPage){
+  currentPage=page;
+  $("listMsg").textContent="Cargando...";
+  $("listMsg").className="msg";
+  try{
+    const q=$("searchInput").value.trim();
+    const st=$("filterStatus").value;
+    const url=`/api/manage/keys?q=${encodeURIComponent(q)}&limit=${LIMIT}&page=${page}${st?"&status="+st:""}`;
+    const d=await api(url);
+    renderKeys(d.keys||[]);
+    $("listMsg").textContent=`${d.total} licencias en total`;
+    renderPagination(d.total,page);
+  }catch(e){
+    $("listMsg").textContent=e.message;
+    $("listMsg").className="msg err";
+  }
+}
+
+function renderKeys(keys){
+  const body=$("keysBody");
+  body.innerHTML="";
+  if(!keys.length){
+    body.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">Sin resultados</td></tr>`;
+    return;
+  }
+  for(const k of keys){
+    const days=daysLeft(k.expiresAt);
+    const daysHtml=k.expiresAt?`<span style="color:${days===0?"var(--err)":days<7?"var(--yellow)":"inherit"}">${days===0?"Expirada":days+"d"}</span>`:"Lifetime";
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td class="key-cell" data-label="Key">${k.key}</td>
+      <td data-label="Plan">${planBadge(k.plan||"falcao")}</td>
+      <td data-label="Estado" class="${statusClass(k.status)}">${k.status||"active"}</td>
+      <td data-label="Expira">${daysHtml}</td>
+      <td data-label="Discord" style="font-size:.75rem;max-width:130px">
+        ${k.claimedByUsername?`<span title="${k.claimedBy||""}">${truncate(k.claimedByUsername,18)}</span>`:"<span style='color:var(--muted)'>—</span>"}
+      </td>
+      <td data-label="IP" style="font-size:.75rem">${truncate(k.ip,18)}</td>
+      <td data-label="HWID" style="font-size:.72rem;max-width:100px;overflow:hidden;text-overflow:ellipsis">${truncate(k.hwid,16)}</td>
+      <td data-label="Acciones"><div class="actions"></div></td>`;
+    const actions=tr.querySelector(".actions");
+    const detailBtn=document.createElement("button");
+    detailBtn.className="btn sm ok-btn";detailBtn.textContent="Ver";
+    detailBtn.onclick=()=>openModal(k);
+    const addBtn=document.createElement("button");
+    addBtn.className="btn sm secondary";addBtn.textContent="+T";
+    addBtn.onclick=()=>modTime(k.key,"add");
+    const subBtn=document.createElement("button");
+    subBtn.className="btn sm secondary";subBtn.textContent="-T";
+    subBtn.onclick=()=>modTime(k.key,"remove");
+    const hwBtn=document.createElement("button");
+    hwBtn.className="btn sm secondary";hwBtn.textContent="HWID";
+    hwBtn.onclick=()=>resetHwid(k.key);
+    const pauseBtn=document.createElement("button");
+    pauseBtn.className="btn sm secondary";
+    pauseBtn.textContent=k.status==="paused"?"Activar":"Pausar";
+    pauseBtn.onclick=()=>togglePause(k.key,k.status);
+    const delBtn=document.createElement("button");
+    delBtn.className="btn sm danger";delBtn.textContent="✕";
+    delBtn.onclick=()=>deleteKey(k.key);
+    actions.append(detailBtn,addBtn,subBtn,hwBtn,pauseBtn,delBtn);
+    body.appendChild(tr);
+  }
+}
+
+function renderPagination(total,page){
+  const totalPages=Math.ceil(total/LIMIT);
+  if(totalPages<=1){$("pagination").innerHTML="";return;}
+  const prev=page>1?`<button class="btn secondary sm" onclick="loadKeys(${page-1})">← Anterior</button>`:"";
+  const next=page<totalPages?`<button class="btn secondary sm" onclick="loadKeys(${page+1})">Siguiente →</button>`:"";
+  $("pagination").innerHTML=`${prev}<span>Página ${page} / ${totalPages}</span>${next}`;
+}
+
+function openModal(k){
+  const days=daysLeft(k.expiresAt);
+  const daysHtml=k.expiresAt
+    ?(days===0?`<span style="color:var(--err)">Expirada</span>`:`${days} días restantes`)
+    :"Lifetime";
+
+  const statusHtml=`<span class="${statusClass(k.status)}">${k.status||"active"}</span>`;
+
+  $("modalBody").innerHTML=`
+    <div class="detail-grid">
+      <div class="detail-item full">
+        <div class="label">Key</div>
+        <div class="value" style="display:flex;align-items:center;gap:8px">
+          <span id="keyVal">${k.key}</span>
+          <button class="btn sm secondary" onclick="navigator.clipboard.writeText('${k.key}')">📋</button>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Estado</div>
+        <div class="value">${statusHtml}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Plan</div>
+        <div class="value">${planBadge(k.plan||"falcao")}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Expira</div>
+        <div class="value">${fmtDate(k.expiresAt)} <span style="color:var(--muted);font-size:.75rem">(${daysHtml})</span></div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Creada</div>
+        <div class="value">${fmtDate(k.createdAt)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Primer login</div>
+        <div class="value">${fmtDate(k.firstLoginAt)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Discord Username</div>
+        <div class="value">${k.claimedByUsername||"—"}</div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Discord ID</div>
+        <div class="value" style="display:flex;align-items:center;gap:6px">
+          ${k.claimedBy||"—"}
+          ${k.claimedBy?`<button class="btn sm secondary" onclick="navigator.clipboard.writeText('${k.claimedBy}')">📋</button>`:""}
+        </div>
+      </div>
+      <div class="detail-item full">
+        <div class="label">HWID</div>
+        <div class="value" style="display:flex;align-items:center;gap:6px">
+          <span>${k.hwid||"—"}</span>
+          ${k.hwid?`<button class="btn sm secondary" onclick="navigator.clipboard.writeText('${k.hwid}')">📋</button>`:""}
+        </div>
+      </div>
+      <div class="detail-item full">
+        <div class="label">IP</div>
+        <div class="value" style="display:flex;align-items:center;gap:6px">
+          <span>${k.ip||"—"}</span>
+          ${k.ip?`<button class="btn sm secondary" onclick="navigator.clipboard.writeText('${k.ip}')">📋</button>`:""}
+        </div>
+      </div>
+      ${k.note?`<div class="detail-item full"><div class="label">Nota</div><div class="value">${k.note}</div></div>`:""}
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="modTime('${k.key}','add')">+ Tiempo</button>
+      <button class="btn secondary" onclick="modTime('${k.key}','remove')">- Tiempo</button>
+      <button class="btn secondary" onclick="resetHwid('${k.key}')">Reset HWID</button>
+      <button class="btn secondary" onclick="togglePause('${k.key}','${k.status}')">
+        ${k.status==="paused"?"Activar":"Pausar"}
+      </button>
+      <button class="btn secondary" onclick="editNote('${k.key}','${(k.note||"").replace(/'/g,"\\'")}')">Nota</button>
+      <button class="btn danger" onclick="deleteKey('${k.key}')">Borrar key</button>
+    </div>
+    <div style="margin-top:18px">
+      <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">📋 Logs de actividad</div>
+      <div id="keyLogsContainer" style="background:#0d1017;border:1px solid var(--stroke);border-radius:10px;padding:10px;max-height:220px;overflow-y:auto;font-size:.75rem;font-family:Consolas,monospace">
+        <span style="color:var(--muted)">Cargando logs...</span>
+      </div>
+    </div>`;
+  $("modalBg").classList.remove("hidden");
+  loadKeyLogs(k.key);
+}
+
+$("modalClose").onclick=()=>$("modalBg").classList.add("hidden");
+$("modalBg").onclick=(e)=>{if(e.target===$("modalBg"))$("modalBg").classList.add("hidden");};
+
+async function loadKeyLogs(key){
+  const ct=document.getElementById("keyLogsContainer");
+  if(!ct)return;
+  ct.innerHTML='<span style="color:var(--muted)">Cargando...</span>';
+  try{
+    const d=await api(`/api/manage/keys/${encodeURIComponent(key)}/logs`);
+    const logs=d.logs||[];
+    if(!logs.length){ct.innerHTML='<span style="color:var(--muted)">Sin logs registrados.</span>';return;}
+    const EVENT_ICONS={
+      first_login:"🟢",login:"✅",login_rejected:"❌",claimed:"🔑",
+      created:"✨",deleted:"🗑️",hwid_reset:"🔄",time_added:"⏫",
+      time_removed:"⏬",status_changed:"🔀",note_updated:"📝",
+      payment_delivered:"💳"
+    };
+    ct.innerHTML=logs.map(l=>{
+      const icon=EVENT_ICONS[l.event]||"📌";
+      const ts=new Date(l.ts).toLocaleString("es-ES",{dateStyle:"short",timeStyle:"short"});
+      const meta=Object.entries(l).filter(([k])=>!["ts","event"].includes(k)).map(([k,v])=>`<span style="color:var(--muted)">${k}:</span> <span style="color:#eef">${String(v).slice(0,60)}</span>`).join(" · ");
+      return `<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span style="color:var(--accent)">${ts}</span> ${icon} <b>${l.event}</b>${meta?" · "+meta:""}
+      </div>`;
+    }).join("");
+  }catch(_){ct.innerHTML='<span style="color:var(--err)">Error al cargar logs.</span>';}
+}
+
+async function modTime(key,mode){
+  const label=mode==="add"?"Añadir tiempo (ej: 7d, 2w, 30 días):":"Quitar tiempo (ej: 7d):";
+  const val=prompt(label,"7d");
+  if(!val)return;
+  try{
+    await api(`/api/manage/keys/${encodeURIComponent(key)}/${mode==="add"?"add-time":"remove-time"}`,{method:"POST",body:JSON.stringify({duration:val})});
+    $("modalBg").classList.add("hidden");
+    loadKeys();
+  }catch(e){alert(e.message);}
+}
+
+async function resetHwid(key){
+  if(!confirm("Resetear HWID + IP + primer login de "+key+"?"))return;
+  try{
+    await api(`/api/manage/keys/${encodeURIComponent(key)}/reset-hwid`,{method:"POST",body:"{}"});
+    $("modalBg").classList.add("hidden");
+    loadKeys();
+  }catch(e){alert(e.message);}
+}
+
+async function togglePause(key,currentStatus){
+  const newStatus=currentStatus==="paused"?"active":"paused";
+  try{
+    await api(`/api/manage/keys/${encodeURIComponent(key)}`,{method:"PATCH",body:JSON.stringify({status:newStatus})});
+    $("modalBg").classList.add("hidden");
+    loadKeys();
+  }catch(e){alert(e.message);}
+}
+
+async function editNote(key,current){
+  const note=prompt("Nota para esta key:",current);
+  if(note===null)return;
+  try{
+    await api(`/api/manage/keys/${encodeURIComponent(key)}`,{method:"PATCH",body:JSON.stringify({note})});
+    $("modalBg").classList.add("hidden");
+    loadKeys();
+  }catch(e){alert(e.message);}
+}
+
+async function deleteKey(key){
+  if(!confirm("Borrar key "+key+"? Esta acción es irreversible."))return;
+  try{
+    await api(`/api/manage/keys/${encodeURIComponent(key)}`,{method:"DELETE"});
+    $("modalBg").classList.add("hidden");
+    loadKeys();
+  }catch(e){alert(e.message);}
+}
+
+$("discordLoginBtn").onclick=()=>{window.location.href="/api/manage/auth/login";};
+$("logoutBtn").onclick=async()=>{
+  try{await api("/api/manage/auth/logout",{method:"POST",body:"{}"});}catch(_){}
+  showAuth(false);
+};
+$("createBtn").onclick=async()=>{
+  try{
+    const d=await api("/api/manage/keys",{method:"POST",body:JSON.stringify({days:parseInt($("createDays").value,10)||30,plan:$("createPlan").value})});
+    navigator.clipboard.writeText(d.key.key).catch(()=>{});
+    alert("Creada y copiada: "+d.key.key);
+    loadKeys();
+  }catch(e){alert(e.message);}
+};
+$("refreshBtn").onclick=()=>loadKeys(1);
+let searchTimer;
+$("searchInput").oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadKeys(1),350);};
+$("filterStatus").onchange=()=>loadKeys(1);
+
+async function loadSpending(){
+  const body=$("spendingBody");
+  if(!body)return;
+  body.innerHTML='<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px">Cargando...</td></tr>';
+  try{
+    const d=await api("/api/payments/spending");
+    const rows=(d.spending||[]);
+    if(!rows.length){
+      body.innerHTML='<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px">Sin compras registradas aún.</td></tr>';
+      return;
+    }
+    body.innerHTML=rows.map(r=>`<tr>
+      <td data-label="Usuario">${r.username||"—"}</td>
+      <td data-label="Discord ID" style="font-size:.75rem;color:var(--muted)">${r.discordId}</td>
+      <td data-label="Pedidos" style="text-align:center">${r.orders}</td>
+      <td data-label="Total" style="font-weight:700;color:var(--ok)">€${Number(r.total).toFixed(2)}</td>
+    </tr>`).join("");
+  }catch(e){
+    body.innerHTML=`<tr><td colspan="4" style="color:var(--err)">Error: ${e.message}</td></tr>`;
+  }
+}
+
+document.getElementById("refreshSpendingBtn")?.addEventListener("click",loadSpending);
+
+checkAuth();
+</script>
+<script>
+(function(){const c=document.getElementById("bgCanvas"),ctx=c.getContext("2d");let w,h,pts;function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;pts=Array.from({length:36},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3}));}function tick(){ctx.clearRect(0,0,w,h);for(const p of pts){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1;}for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);if(d<130){ctx.strokeStyle=`rgba(232,88,34,${(1-d/130)*.15})`;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();}}ctx.fillStyle="rgba(232,88,34,.45)";ctx.beginPath();ctx.arc(pts[i].x,pts[i].y,1.4,0,Math.PI*2);ctx.fill();}requestAnimationFrame(tick);}resize();window.addEventListener("resize",resize);tick();})();
+</script>
+</body>
+</html>

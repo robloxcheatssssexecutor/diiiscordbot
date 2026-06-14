@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Falcao External — Showcase</title>
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png" />
+  <link rel="preconnect" href="https://i.imgur.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    :root {
+      --layout: #101015;
+      --section: #121217;
+      --stroke: #2a2a35;
+      --text: #e8e8ee;
+      --muted: #8a8a9a;
+      --accent: #e85822;
+      --accent-dim: rgba(232, 88, 34, 0.18);
+      --widget: #1c1c24;
+      --ok: #3ecf6a;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Inter, system-ui, sans-serif;
+      background: #08080c;
+      color: var(--text);
+      overflow-x: hidden;
+    }
+    .scene {
+      min-height: 100vh;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px 80px;
+    }
+    #bgPlexus {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.35;
+      z-index: 0;
+    }
+    .preview-banner {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(232, 88, 34, 0.92);
+      color: #111;
+      text-align: center;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .preview-banner a { color: #111; }
+    .hud-brand {
+      position: fixed;
+      top: 44px; left: 16px;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 16, 21, 0.88);
+      border: 1px solid var(--stroke);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      pointer-events: none;
+    }
+    .hud-brand img { width: 22px; height: 22px; border-radius: 4px; }
+    .hud-brand .accent { color: var(--accent); font-weight: 700; }
+    .hud-binds {
+      position: fixed;
+      top: 44px; right: 16px;
+      z-index: 5;
+      background: rgba(16, 16, 21, 0.88);
+      border: 1px solid var(--stroke);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.72rem;
+      pointer-events: none;
+    }
+    .hud-binds .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; color: var(--muted); }
+    .hud-binds .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+    .menu-window {
+      width: min(900px, 100%);
+      height: 520px;
+      background: var(--layout);
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      display: grid;
+      grid-template-columns: 148px 1fr;
+      grid-template-rows: 46px 1fr;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,.55);
+      position: relative;
+      z-index: 1;
+    }
+    #menuPlexus {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .menu-header, .sidebar, .content { position: relative; z-index: 1; }
+    .menu-header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid var(--stroke);
+      background: rgba(18, 18, 23, 0.94);
+      padding: 0 12px;
+      gap: 10px;
+    }
+    .menu-header img { width: 36px; height: 36px; border-radius: 6px; }
+    .menu-header .title { font-weight: 700; font-size: 0.95rem; }
+    .menu-header .sub { color: var(--muted); font-size: 0.72rem; }
+    .menu-header .tools { margin-left: auto; display: flex; gap: 8px; }
+    .tool-btn {
+      width: 30px; height: 30px;
+      border-radius: 6px;
+      border: 1px solid var(--stroke);
+      background: var(--widget);
+      color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .tool-btn:hover { color: var(--accent); background: var(--accent-dim); }
+    .tool-btn.active { color: var(--accent); border-color: var(--accent); }
+    .sidebar {
+      background: rgba(18, 18, 23, 0.92);
+      border-right: 1px solid var(--stroke);
+      overflow-y: auto;
+      padding: 8px 6px 12px;
+    }
+    .sb-group { margin-bottom: 4px; }
+    .sb-group-hdr {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 8px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      transition: background .15s, color .15s;
+    }
+    .sb-group-hdr.open { color: var(--accent); background: var(--accent-dim); }
+    .sb-group-hdr i { width: 14px; text-align: center; }
+    .sb-items {
+      overflow: hidden;
+      transition: max-height .28s ease, opacity .22s ease;
+      opacity: 1;
+    }
+    .sb-items.collapsed { max-height: 0 !important; opacity: 0; }
+    .sb-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 7px 8px 7px 28px;
+      border-radius: 6px;
+      font-size: 0.76rem;
+      cursor: pointer;
+      transition: background .12s, color .12s;
+    }
+    .sb-item:hover { color: var(--text); }
+    .sb-item.active { color: var(--accent); background: var(--accent-dim); }
+    .content {
+      overflow-y: auto;
+      padding: 14px 16px 20px;
+      background: rgba(16, 16, 21, 0.55);
+      transition: opacity .18s ease;
+    }
+    .content.fading { opacity: 0; }
+    .content h2 {
+      margin: 0 0 12px;
+      font-size: 0.95rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .group { margin-bottom: 14px; }
+    .group-title {
+      font-size: 0.82rem;
+      color: var(--text);
+      margin-bottom: 8px;
+      opacity: 0.9;
+    }
+    .option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .option label { font-size: 0.82rem; flex: 1; color: var(--text); }
+    .ctrl { flex-shrink: 0; }
+    .toggle {
+      width: 40px; height: 22px;
+      background: #303040;
+      border-radius: 999px;
+      position: relative;
+      border: 0;
+      cursor: pointer;
+      transition: background .2s ease;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: "";
+      position: absolute;
+      width: 16px; height: 16px;
+      top: 3px; left: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: left .2s ease;
+    }
+    .toggle.on::after { left: 21px; }
+    .slider-wrap {
+      display: flex; align-items: center; gap: 8px;
+      min-width: 170px;
+    }
+    .slider-wrap input[type=range] {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .slider-val {
+      font-size: 0.72rem;
+      color: var(--muted);
+      min-width: 46px;
+      text-align: right;
+    }
+    select.fake, .fake-btn {
+      background: var(--widget);
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .fake-btn:hover { border-color: var(--accent); color: var(--text); }
+    .dynamic-note {
+      background: var(--widget);
+      border: 1px dashed var(--stroke);
+      border-radius: 8px;
+      padding: 16px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: center;
+    }
+    .footer-link {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.78rem;
+      color: var(--muted);
+      z-index: 2;
+    }
+    .footer-link a { color: var(--accent); }
+    @media (max-width: 720px) {
+      .menu-window {
+        height: auto;
+        min-height: 480px;
+        grid-template-columns: 1fr;
+        grid-template-rows: 46px auto 1fr;
+      }
+      .sidebar { border-right: 0; border-bottom: 1px solid var(--stroke); max-height: 140px; }
+      .hud-binds { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bgPlexus"></canvas>
+  <div class="preview-banner">
+    Vista previa interactiva del menu de PC — los cambios aqui no afectan al juego.
+    <a href="/panel">Ir al panel remoto</a> · <a href="/">Inicio</a>
+  </div>
+
+  <div class="hud-brand">
+    <img src="https://i.imgur.com/0nTvfnO.png" alt="Falcao" width="64" height="64" loading="lazy" style="width:28px;height:28px;object-fit:contain" />
+    <span><span class="accent">Falcao External</span> · <span id="hudPlaytime">00:00:00</span> · <span id="hudClock">--:--</span></span>
+  </div>
+
+  <div class="hud-binds" id="hudBinds"></div>
+
+  <div class="scene">
+    <div class="menu-window" id="menuWindow">
+      <canvas id="menuPlexus"></canvas>
+      <div class="menu-header">
+        <img src="https://i.imgur.com/0nTvfnO.png" alt="Falcao" width="128" height="128" loading="eager" style="width:52px;height:52px;object-fit:contain;border-radius:10px" />
+        <div>
+          <div class="title">Falcao External</div>
+          <div class="sub">Showcase — menu de PC</div>
+        </div>
+        <div class="tools">
+          <button type="button" class="tool-btn" id="btnSearch" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
+          <button type="button" class="tool-btn" id="btnInfo" title="Info"><i class="fa-solid fa-circle-info"></i></button>
+          <button type="button" class="tool-btn" id="btnSettings" title="Ajustes"><i class="fa-solid fa-gear"></i></button>
+        </div>
+      </div>
+      <nav class="sidebar" id="sidebar"></nav>
+      <main class="content" id="content">
+        <p style="color:var(--muted)">Cargando menu...</p>
+      </main>
+    </div>
+  </div>
+
+  <div class="footer-link">
+    Panel remoto: <a href="/panel">/panel</a> · Discord: <a href="https://discord.gg/falcao" target="_blank" rel="noopener">discord.gg/falcao</a>
+  </div>
+
+  <script>
+    const INLINE_SCHEMA = /*__INLINE_SCHEMA__*/null;
+    const LANG = "es";
+    const GROUP_ICONS = { combat: "fa-crosshairs", visuals: "fa-eye", exploits: "fa-bolt", misc: "fa-sliders" };
+    const HIDDEN_KEYS = new Set(["exp_player_scale_enabled"]);
+    const FIXED_DEFAULTS = { exp_player_scale: 1, exp_shrink: false };
+
+    let schema = null;
+    const sessionStart = Date.now();
+    let activeSection = 0;
+    let expandedGroup = 0;
+    const demoValues = new Map();
+    const demoBinds = { esp_bind: 117, god_bind: 0, noclip_bind: 0 };
+
+    function t(obj) { return (obj && (obj[LANG] || obj.en)) || ""; }
+
+    function seedDemo(key, kind, extra) {
+      if (demoValues.has(key)) return demoValues.get(key);
+      if (Object.prototype.hasOwnProperty.call(FIXED_DEFAULTS, key)) {
+        demoValues.set(key, FIXED_DEFAULTS[key]);
+        return FIXED_DEFAULTS[key];
+      }
+      let v;
+      if (kind === "bool") v = Math.random() > 0.7;
+      else if (kind === "int") v = Math.floor((extra.min || 0) + Math.random() * ((extra.max || 100) - (extra.min || 0)));
+      else if (kind === "float") v = +((extra.min || 0) + Math.random() * ((extra.max || 1) - (extra.min || 0))).toFixed(2);
+      else if (kind === "bind") v = 0;
+      else if (kind === "rgba") v = [0.9, 0.35, 0.13, 1];
+      else v = 0;
+      demoValues.set(key, v);
+      return v;
+    }
+
+    function renderToggle(key, on) {
+      return `<button type="button" class="ctrl toggle${on ? " on" : ""}" data-key="${key}" aria-pressed="${on}"></button>`;
+    }
+
+    function renderSlider(key, val, min, max, step) {
+      const pct = Math.min(100, Math.max(0, ((val - min) / (max - min)) * 100));
+      const label = Number.isInteger(val) ? val : val.toFixed(2);
+      return `<div class="ctrl slider-wrap" data-key="${key}">
+        <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" />
+        <span class="slider-val">${label}${key === "exp_player_scale" ? "x" : ""}</span>
+      </div>`;
+    }
+
+    function renderSelect(key, val, options) {
+      const list = options && (options[LANG] || options.en) || [];
+      const text = list[val] || list[0] || "—";
+      return `<button type="button" class="ctrl fake-btn" data-select-key="${key}">${text}</button>`;
+    }
+
+    function renderBind(key, val) {
+      return `<button type="button" class="ctrl fake-btn" data-bind-key="${key}">${val ? "VK " + val : "None"}</button>`;
+    }
+
+    function renderItem(item) {
+      if (HIDDEN_KEYS.has(item.key)) return "";
+      const v = seedDemo(item.key, item.kind, item);
+      if (item.kind === "action") {
+        return `<div class="option"><label>${t(item.label)}</label><button type="button" class="ctrl fake-btn" data-action="${item.key}">${t(item.label)}</button></div>`;
+      }
+      if (item.kind === "bool" || (item.kind === "int" && item.max === 1 && item.min === 0)) {
+        return `<div class="option"><label>${t(item.label)}</label>${renderToggle(item.key, !!v)}</div>`;
+      }
+      if (item.kind === "bind") {
+        return `<div class="option"><label>${t(item.label)}</label>${renderBind(item.key, v)}</div>`;
+      }
+      if (item.options) {
+        return `<div class="option"><label>${t(item.label)}</label>${renderSelect(item.key, v, item.options)}</div>`;
+      }
+      if (item.kind === "float" || item.kind === "int") {
+        return `<div class="option"><label>${t(item.label)}</label>${renderSlider(item.key, v, item.min ?? 0, item.max ?? 100, item.step ?? 1)}</div>`;
+      }
+      if (item.kind === "rgba") {
+        const c = `rgba(${Math.round(v[0]*255)},${Math.round(v[1]*255)},${Math.round(v[2]*255)},${v[3]})`;
+        return `<div class="option"><label>${t(item.label)}</label><div class="ctrl" style="width:36px;height:22px;border-radius:4px;background:${c}"></div></div>`;
+      }
+      return `<div class="option"><label>${t(item.label)}</label>${renderToggle(item.key, false)}</div>`;
+    }
+
+    function renderHudBinds() {
+      const el = document.getElementById("hudBinds");
+      const rows = [
+        ["esp_bind", "ESP"],
+        ["god_bind", "Godmode"],
+        ["noclip_bind", "Noclip"]
+      ];
+      el.innerHTML = rows.map(([k, label]) => {
+        const on = !!demoValues.get(k) || !!demoBinds[k];
+        const vk = demoValues.get(k) || demoBinds[k] || 0;
+        return `<div class="row"><span class="dot" style="background:${on ? "var(--ok)" : "#555"}"></span> ${label} <span style="margin-left:auto;color:var(--text)">${vk ? "VK " + vk : "—"}</span></div>`;
+      }).join("");
+    }
+
+    function bindContentInteractions() {
+      const content = document.getElementById("content");
+      content.querySelectorAll(".toggle[data-key]").forEach((btn) => {
+        btn.onclick = () => {
+          const key = btn.dataset.key;
+          const next = !demoValues.get(key);
+          demoValues.set(key, next);
+          btn.classList.toggle("on", next);
+          btn.setAttribute("aria-pressed", next);
+          renderHudBinds();
+        };
+      });
+      content.querySelectorAll(".slider-wrap").forEach((wrap) => {
+        const key = wrap.dataset.key;
+        const range = wrap.querySelector("input[type=range]");
+        const valEl = wrap.querySelector(".slider-val");
+        range.oninput = () => {
+          const v = parseFloat(range.value);
+          demoValues.set(key, v);
+          valEl.textContent = (Number.isInteger(v) ? v : v.toFixed(2)) + (key === "exp_player_scale" ? "x" : "");
+        };
+      });
+      content.querySelectorAll("[data-select-key]").forEach((btn) => {
+        btn.onclick = () => btn.classList.toggle("on");
+      });
+      content.querySelectorAll("[data-action]").forEach((btn) => {
+        btn.onclick = () => {
+          btn.textContent = "OK";
+          setTimeout(() => renderSection(false), 400);
+        };
+      });
+    }
+
+    function renderSection(animate) {
+      const sec = schema.sections.find(s => s.id === activeSection);
+      const el = document.getElementById("content");
+      if (!sec) { el.innerHTML = "<p>Seccion no encontrada</p>"; return; }
+
+      const doRender = () => {
+        let html = `<h2>${t(sec)}</h2>`;
+        if (sec.dynamic) {
+          const labels = {
+            txadmin: "TxAdmin — lista de jugadores y acciones del servidor",
+            resources: "Resources — lista de recursos del servidor",
+            list: "Lista — jugadores y vehiculos cercanos",
+            lua: "Editor Lua — ejecutar scripts en el servidor"
+          };
+          html += `<div class="dynamic-note"><i class="fa-solid fa-lock"></i> ${labels[sec.dynamic] || sec.dynamic}<br><br>Esta seccion requiere el external conectado al juego.</div>`;
+        } else {
+          for (const grp of sec.groups || []) {
+            html += `<div class="group"><div class="group-title">${t(grp)}</div>`;
+            for (const item of grp.items || []) html += renderItem(item);
+            html += `</div>`;
+          }
+        }
+        el.innerHTML = html;
+        el.classList.remove("fading");
+        bindContentInteractions();
+        renderSidebar();
+        renderHudBinds();
+      };
+
+      if (animate === false) { doRender(); return; }
+      el.classList.add("fading");
+      setTimeout(doRender, 120);
+    }
+
+    function renderSidebar() {
+      const nav = document.getElementById("sidebar");
+      nav.innerHTML = "";
+      (schema.categories || []).forEach((cat, gi) => {
+        const wrap = document.createElement("div");
+        wrap.className = "sb-group";
+        const hdr = document.createElement("div");
+        hdr.className = "sb-group-hdr" + (expandedGroup === gi ? " open" : "");
+        const icon = GROUP_ICONS[cat.id] || "fa-folder";
+        hdr.innerHTML = `<i class="fa-solid ${icon}"></i><span>${t(cat)}</span><i class="fa-solid fa-chevron-down" style="margin-left:auto;font-size:.65rem;transition:transform .2s;transform:rotate(${expandedGroup === gi ? 180 : 0}deg)"></i>`;
+        hdr.onclick = () => {
+          expandedGroup = expandedGroup === gi ? -1 : gi;
+          renderSidebar();
+        };
+        wrap.appendChild(hdr);
+
+        const items = document.createElement("div");
+        const open = expandedGroup === gi;
+        items.className = "sb-items" + (open ? "" : " collapsed");
+        const count = (cat.sections || []).length;
+        items.style.maxHeight = open ? (count * 34 + 8) + "px" : "0px";
+        for (const sid of cat.sections || []) {
+          const sec = schema.sections.find(s => s.id === sid);
+          if (!sec) continue;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "sb-item" + (activeSection === sid ? " active" : "");
+          btn.textContent = t(sec);
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            if (activeSection !== sid) { activeSection = sid; renderSection(true); }
+          };
+          items.appendChild(btn);
+        }
+        wrap.appendChild(items);
+        nav.appendChild(wrap);
+      });
+    }
+
+    function pad2(n) { return String(n).padStart(2, "0"); }
+
+    function tickHudClock() {
+      const now = new Date();
+      const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+      const h = Math.floor(elapsed / 3600);
+      const m = Math.floor((elapsed % 3600) / 60);
+      const s = elapsed % 60;
+      document.getElementById("hudPlaytime").textContent = pad2(h) + ":" + pad2(m) + ":" + pad2(s);
+      document.getElementById("hudClock").textContent = pad2(now.getHours()) + ":" + pad2(now.getMinutes());
+    }
+
+    function initPlexus(canvas, alphaMul) {
+      const ctx = canvas.getContext("2d");
+      const cols = 4, rows = 3;
+      const nodeCount = cols * rows;
+      let nodes = [];
+      let live = [];
+      let bounds = { x: 0, y: 0, w: 0, h: 0 };
+      let lastTick = 0;
+
+      function resize() {
+        const parent = canvas.parentElement === document.body ? document.body : canvas.parentElement;
+        const rect = parent.getBoundingClientRect();
+        bounds = { x: 0, y: 0, w: rect.width, h: rect.height };
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        nodes = [];
+        const cellW = bounds.w / cols;
+        const cellH = bounds.h / rows;
+        for (let i = 0; i < nodeCount; i++) {
+          const col = i % cols, row = Math.floor(i / cols);
+          nodes.push({
+            base: {
+              x: (col + 0.5) * cellW + (Math.random() - 0.5) * cellW * 0.5,
+              y: (row + 0.5) * cellH + (Math.random() - 0.5) * cellH * 0.5
+            },
+            phase: Math.random() * Math.PI * 2
+          });
+        }
+        live = nodes.map(n => ({ ...n.base }));
+      }
+
+      function tick(ts) {
+        if (ts - lastTick > 33) {
+          lastTick = ts;
+          const t = ts * 0.001;
+          live = nodes.map((n, i) => ({
+            x: n.base.x + Math.cos(t * 0.55 + n.phase) * 5 + Math.sin(t * 0.18 + n.phase) * 1.6,
+            y: n.base.y + Math.sin(t * 0.62 + n.phase) * 4 + Math.cos(t * 0.16 + n.phase) * 1.4
+          }));
+        }
+        ctx.clearRect(0, 0, bounds.w, bounds.h);
+        const linkDist = Math.max(bounds.w, bounds.h) * 0.34;
+        const linkSq = linkDist * linkDist;
+        for (let a = 0; a < nodeCount; a++) {
+          const colA = a % cols, rowA = Math.floor(a / cols);
+          for (let b = a + 1; b < nodeCount; b++) {
+            const colB = b % cols, rowB = Math.floor(b / cols);
+            if (Math.abs(colA - colB) > 1 || Math.abs(rowA - rowB) > 1) continue;
+            const dx = live[a].x - live[b].x, dy = live[a].y - live[b].y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 <= linkSq) {
+              const alpha = (1 - d2 / linkSq) * 0.22 * alphaMul;
+              ctx.strokeStyle = `rgba(232,88,34,${alpha})`;
+              ctx.beginPath();
+              ctx.moveTo(live[a].x, live[a].y);
+              ctx.lineTo(live[b].x, live[b].y);
+              ctx.stroke();
+            }
+          }
+          ctx.fillStyle = `rgba(232,88,34,${0.36 * alphaMul})`;
+          ctx.beginPath();
+          ctx.arc(live[a].x, live[a].y, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        requestAnimationFrame(tick);
+      }
+
+      resize();
+      window.addEventListener("resize", resize);
+      requestAnimationFrame(tick);
+    }
+
+    async function loadSchema() {
+      if (INLINE_SCHEMA) return INLINE_SCHEMA;
+      const urls = ["/api/panel/schema", "https://falcaobot.onrender.com/api/panel/schema"];
+      for (const url of urls) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (data.schema) return data.schema;
+        } catch (_) {}
+      }
+      throw new Error("schema");
+    }
+
+    async function init() {
+      schema = await loadSchema();
+      activeSection = 0;
+      expandedGroup = 0;
+      tickHudClock();
+      setInterval(tickHudClock, 1000);
+      initPlexus(document.getElementById("bgPlexus"), 1);
+      initPlexus(document.getElementById("menuPlexus"), 0.85);
+      document.getElementById("btnInfo").onclick = () => {
+        activeSection = schema.sections.findIndex(s => s.id === 13) >= 0 ? 13 : activeSection;
+        renderSection(true);
+      };
+      document.getElementById("btnSettings").onclick = () => {
+        activeSection = schema.sections.findIndex(s => s.id === 14) >= 0 ? 14 : activeSection;
+        renderSection(true);
+      };
+      renderSection(false);
+    }
+
+    init().catch(() => {
+      document.getElementById("content").innerHTML = "<p style='color:#ff5d5d'>No se pudo cargar el menu. Usa /showcase en el servidor.</p>";
+    });
+  </script>
+</body>
+</html>
