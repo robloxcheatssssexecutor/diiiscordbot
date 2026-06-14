@@ -172,14 +172,14 @@ function mountManageApi(app, deps) {
     res.type("html").send(html);
   });
 
-  app.get("/api/manage/auth/status", (req, res) => {
-
   // ── Quick admin check by Discord ID (no manage session needed) ────────────
   app.get("/api/manage/is-admin", (req, res) => {
     const discordId = String(req.query.discordId || "").trim();
     if (!discordId) { res.json({ ok: true, isAdmin: false }); return; }
     res.json({ ok: true, isAdmin: isAdminDiscordId(discordId) });
   });
+
+  app.get("/api/manage/auth/status", (req, res) => {
     const session = getManageSession(req);
     if (!session || !isAdminDiscordId(session.discordId)) {
       res.json({ ok: true, authenticated: false });
