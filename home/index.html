@@ -18,16 +18,9 @@
 
     /* ── BACKGROUND ── */
     #heroBg{position:fixed;inset:0;z-index:0;pointer-events:none;
-      background:
-        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,120,30,.22) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 50% -10%, rgba(255,200,60,.15) 0%, transparent 50%),
-        radial-gradient(ellipse 100% 80% at 30% 100%, rgba(60,20,80,.8) 0%, transparent 70%),
-        radial-gradient(ellipse 100% 80% at 70% 100%, rgba(30,10,60,.8) 0%, transparent 70%),
-        linear-gradient(to bottom, #1a0a1e 0%, #2d0f0a 35%, #0e0610 70%, #050308 100%)}
+      background:#06040a url('/bg.jpg') center/cover no-repeat}
     #heroBg::after{content:'';position:absolute;inset:0;
-      background:
-        radial-gradient(ellipse 40% 30% at 50% 20%, rgba(232,88,34,.08) 0%, transparent 100%),
-        linear-gradient(to bottom, rgba(5,3,8,.1) 0%, rgba(5,3,8,.5) 60%, rgba(5,3,8,.95) 100%)}
+      background:linear-gradient(to bottom,rgba(6,4,10,.45) 0%,rgba(6,4,10,.65) 55%,rgba(6,4,10,1) 100%)}
 
     /* ── NAVBAR ── */
     .nav{position:fixed;top:0;left:0;right:0;z-index:200;height:62px;
@@ -146,9 +139,9 @@
     /* ── DASHBOARD ── */
     .dash-header{background:var(--card);border:1px solid var(--stroke);border-radius:16px;
       overflow:hidden;margin-bottom:24px}
-    .dash-banner{height:120px;background:linear-gradient(135deg,#1a0e08,#2d1508);position:relative;overflow:hidden}
-    .dash-banner img{width:100%;height:100%;object-fit:cover;opacity:.35}
-    .dash-banner-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,10,10,.8),transparent)}
+    .dash-banner{height:120px;background:linear-gradient(135deg,#1a0800 0%,#3d1200 40%,#1a0510 100%);position:relative;overflow:hidden}
+    .dash-banner::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 100% at 50% 100%,rgba(232,88,34,.15),transparent)}
+    .dash-banner-overlay{position:absolute;inset:0;background:linear-gradient(to right,rgba(10,10,10,.7),transparent 60%)}
     .dash-user{padding:18px 22px;display:flex;align-items:center;gap:14px}
     .dash-avatar{width:64px;height:64px;border-radius:50%;border:3px solid var(--accent);
       margin-top:-40px;position:relative;z-index:2;background:var(--card2)}
@@ -178,7 +171,8 @@
     /* ── SETTINGS ── */
     .settings-banner{background:var(--card);border:1px solid var(--stroke);border-radius:16px;
       overflow:hidden;margin-bottom:24px}
-    .settings-banner-img{height:110px;position:relative;overflow:hidden}
+    .settings-banner-img{height:110px;position:relative;overflow:hidden;background:linear-gradient(135deg,#1a0800 0%,#3d1200 40%,#1a0510 100%)}
+    .settings-banner-img::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 100% at 50% 100%,rgba(232,88,34,.12),transparent)}
     .settings-banner-img img{width:100%;height:100%;object-fit:cover;opacity:.4}
     .settings-user-row{padding:16px 22px;display:flex;align-items:center;gap:14px}
     .s-avatar{width:58px;height:58px;border-radius:50%;border:2px solid var(--stroke);margin-top:-36px;position:relative;z-index:2}
@@ -250,6 +244,7 @@
     .badge-paused{background:rgba(234,179,8,.15);color:var(--yellow);border:1px solid rgba(234,179,8,.3)}
     .empty-state{text-align:center;padding:48px 20px;color:var(--muted);font-size:.85rem}
     .divider{border:none;border-top:1px solid var(--stroke);margin:24px 0}
+    .card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:16px}
     footer{text-align:center;padding:32px 20px;color:var(--muted);font-size:.75rem;border-top:1px solid var(--stroke)}
     footer a{color:var(--accent);text-decoration:none}
     @media(max-width:560px){.nav-links{gap:0}.nav-link{padding:6px 9px;font-size:.75rem}}
@@ -761,7 +756,6 @@ async function renderDashboard() {
   ct.innerHTML = `
     <div class="dash-header">
       <div class="dash-banner">
-        <img src="https://i.imgur.com/JuXCB5n.jpg" alt="banner" onerror="this.style.opacity='0'"/>
         <div class="dash-banner-overlay"></div>
       </div>
       <div class="dash-user">
@@ -808,7 +802,6 @@ async function renderSettings() {
   ct.innerHTML = `
     <div class="settings-banner">
       <div class="settings-banner-img">
-        <img src="https://i.imgur.com/JuXCB5n.jpg" alt="banner" onerror="this.style.opacity='0'"/>
       </div>
       <div class="settings-user-row">
         <img class="s-avatar" src="${avatarSrc}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
@@ -1014,7 +1007,7 @@ async function renderManage() {
   const ct = document.getElementById('manageContent');
   if (!ct) return;
   if (!currentUser) {
-    ct.innerHTML = `<div class="login-cta"><h2>Acceso denegado</h2><p>Debes iniciar sesión como administrador.</p><a class="btn-discord" href="/api/account/auth/login">Iniciar sesión con Discord</a></div>`;
+    ct.innerHTML = `<div class="login-cta"><h2>Acceso denegado</h2><p>Debes iniciar sesión como administrador.</p><a class="btn-discord" href="/api/account/auth/login">Iniciar sesión</a></div>`;
     return;
   }
   try {
@@ -1024,13 +1017,111 @@ async function renderManage() {
       return;
     }
   } catch (_) {}
-  // Embed the manage page in an iframe
+
   ct.innerHTML = `
-    <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
-      <h2 style="font-size:1.1rem;font-weight:700">Panel Admin</h2>
-      <a href="/manage" target="_blank" style="color:var(--accent);font-size:.82rem;text-decoration:none;border:1px solid rgba(232,88,34,.3);padding:6px 13px;border-radius:8px">Abrir en ventana completa ↗</a>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="font-size:1.1rem;font-weight:700">🛠 Panel Admin</h2>
+      <button class="btn-sm" style="background:rgba(232,88,34,.12);color:var(--accent);border:1px solid rgba(232,88,34,.3);border-radius:8px;padding:7px 14px;cursor:pointer;font-family:inherit;font-size:.8rem" onclick="loadManageKeys(1)">↻ Actualizar</button>
     </div>
-    <iframe src="/manage" style="width:100%;height:calc(100vh - 200px);border:1px solid var(--stroke);border-radius:14px;background:var(--card)" title="Admin Panel"></iframe>`;
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center">
+        <input type="search" id="mgSearch" placeholder="Buscar key, hwid, ip..." style="flex:1;min-width:160px;padding:9px 12px;border-radius:10px;border:1px solid var(--stroke);background:#0d1017;color:var(--text);font:inherit;font-size:.83rem"/>
+        <select id="mgStatus" style="padding:9px 12px;border-radius:10px;border:1px solid var(--stroke);background:#0d1017;color:var(--text);font:inherit;font-size:.83rem">
+          <option value="">Todos</option><option value="active">Activas</option><option value="expired">Expiradas</option><option value="paused">Pausadas</option>
+        </select>
+        <select id="mgPlan" style="padding:9px 12px;border-radius:10px;border:1px solid var(--stroke);background:#0d1017;color:var(--text);font:inherit;font-size:.83rem">
+          <option value="falcao">falcao</option><option value="temp">temp</option><option value="both">both</option>
+        </select>
+        <input type="number" id="mgDays" value="30" min="1" style="width:70px;padding:9px 12px;border-radius:10px;border:1px solid var(--stroke);background:#0d1017;color:var(--text);font:inherit;font-size:.83rem" title="Días"/>
+        <button onclick="mgCreate()" style="background:var(--accent);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:.83rem;font-weight:700;cursor:pointer;font-family:inherit">+ Crear</button>
+      </div>
+      <p id="mgMsg" style="font-size:.8rem;color:var(--muted);margin-bottom:8px"></p>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.79rem">
+          <thead><tr style="color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em">
+            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Key</th>
+            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Plan</th>
+            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Estado</th>
+            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Expira</th>
+            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Discord</th>
+            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Acciones</th>
+          </tr></thead>
+          <tbody id="mgBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="mgPagination" style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:.82rem"></div>
+    </div>`;
+
+  document.getElementById('mgSearch').oninput = () => { clearTimeout(window._mgT); window._mgT = setTimeout(() => loadManageKeys(1), 350); };
+  document.getElementById('mgStatus').onchange = () => loadManageKeys(1);
+  loadManageKeys(1);
+}
+
+window._mgPage = 1;
+async function loadManageKeys(page) {
+  window._mgPage = page;
+  const q = (document.getElementById('mgSearch') || {}).value || '';
+  const st = (document.getElementById('mgStatus') || {}).value || '';
+  const body = document.getElementById('mgBody');
+  const msg = document.getElementById('mgMsg');
+  if (!body) return;
+  try {
+    const d = await api(`/api/manage/keys?q=${encodeURIComponent(q)}&limit=20&page=${page}${st ? '&status=' + st : ''}`);
+    const keys = d.keys || [];
+    if (msg) msg.textContent = `${d.total || 0} licencias en total`;
+    body.innerHTML = keys.length ? keys.map(k => {
+      const days = daysLeft(k.expiresAt);
+      const sc = { active: 'color:#22c55e', expired: 'color:#ef4444', paused: 'color:#eab308' }[k.status] || '';
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+        <td style="padding:8px 6px;font-family:monospace;font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">${k.key}</td>
+        <td style="padding:8px 6px"><span style="background:rgba(232,88,34,.12);color:var(--accent);border-radius:999px;padding:2px 8px;font-size:.7rem;font-weight:700">${k.plan || 'falcao'}</span></td>
+        <td style="padding:8px 6px;${sc};font-weight:600">${k.status}</td>
+        <td style="padding:8px 6px">${k.expiresAt ? (days === 0 ? '<span style="color:#ef4444">Expirada</span>' : days + 'd') : 'Lifetime'}</td>
+        <td style="padding:8px 6px;font-size:.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis">${k.claimedByUsername || '—'}</td>
+        <td style="padding:8px 6px">
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="btn-sm" style="background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.25);border-radius:7px;padding:4px 8px;cursor:pointer;font-family:inherit;font-size:.72rem" onclick="copy('${k.key}',this)">📋</button>
+            <button class="btn-sm" style="background:var(--card2);color:var(--muted);border:1px solid var(--stroke);border-radius:7px;padding:4px 8px;cursor:pointer;font-family:inherit;font-size:.72rem" onclick="mgResetHwid('${k.key}')">HWID</button>
+            <button class="btn-sm" style="background:var(--card2);color:var(--muted);border:1px solid var(--stroke);border-radius:7px;padding:4px 8px;cursor:pointer;font-family:inherit;font-size:.72rem" onclick="mgToggle('${k.key}','${k.status}')">${k.status === 'paused' ? '▶' : '⏸'}</button>
+            <button class="btn-sm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25);border-radius:7px;padding:4px 8px;cursor:pointer;font-family:inherit;font-size:.72rem" onclick="mgDelete('${k.key}')">✕</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Sin resultados</td></tr>';
+    // Pagination
+    const total = d.total || 0;
+    const totalPages = Math.ceil(total / 20);
+    const pag = document.getElementById('mgPagination');
+    if (pag) pag.innerHTML = totalPages > 1 ? `
+      ${page > 1 ? `<button onclick="loadManageKeys(${page-1})" style="background:var(--card2);border:1px solid var(--stroke);color:var(--text);border-radius:7px;padding:5px 10px;cursor:pointer;font-family:inherit;font-size:.78rem">← Ant</button>` : ''}
+      <span style="color:var(--muted)">Pág ${page}/${totalPages}</span>
+      ${page < totalPages ? `<button onclick="loadManageKeys(${page+1})" style="background:var(--card2);border:1px solid var(--stroke);color:var(--text);border-radius:7px;padding:5px 10px;cursor:pointer;font-family:inherit;font-size:.78rem">Sig →</button>` : ''}` : '';
+  } catch (e) {
+    if (body) body.innerHTML = `<tr><td colspan="6" style="color:#ef4444;text-align:center;padding:16px">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function mgCreate() {
+  try {
+    const d = await api('/api/manage/keys', { method: 'POST', body: JSON.stringify({ days: parseInt(document.getElementById('mgDays').value) || 30, plan: document.getElementById('mgPlan').value }) });
+    copy(d.key.key);
+    alert('Key creada y copiada: ' + d.key.key);
+    loadManageKeys(window._mgPage || 1);
+  } catch (e) { alert(e.message); }
+}
+async function mgResetHwid(key) {
+  if (!confirm('Resetear HWID de ' + key + '?')) return;
+  try { await api(`/api/manage/keys/${encodeURIComponent(key)}/reset-hwid`, { method: 'POST', body: '{}' }); loadManageKeys(window._mgPage || 1); }
+  catch (e) { alert(e.message); }
+}
+async function mgToggle(key, status) {
+  try { await api(`/api/manage/keys/${encodeURIComponent(key)}`, { method: 'PATCH', body: JSON.stringify({ status: status === 'paused' ? 'active' : 'paused' }) }); loadManageKeys(window._mgPage || 1); }
+  catch (e) { alert(e.message); }
+}
+async function mgDelete(key) {
+  if (!confirm('Borrar ' + key + '? Irreversible.')) return;
+  try { await api(`/api/manage/keys/${encodeURIComponent(key)}`, { method: 'DELETE' }); loadManageKeys(window._mgPage || 1); }
+  catch (e) { alert(e.message); }
 }
 
 async function initAuth() {
