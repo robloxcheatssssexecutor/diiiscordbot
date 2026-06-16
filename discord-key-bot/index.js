@@ -1264,6 +1264,7 @@ client.once("ready", async () => {
       .addNumberOption((o) => o.setName("descuento").setDescription("Discount percentage").setRequired(true))
       .addStringOption((o) => o.setName("duracion").setDescription("Duration e.g. 7d, 24h").setRequired(true)),
     new SlashCommandBuilder().setName("offeroff").setDescription("Disable current active offer."),
+    new SlashCommandBuilder().setName("webofferoff").setDescription("Desactiva la oferta web activa y elimina el mensaje de anuncio."),
     new SlashCommandBuilder()
       .setName("weboffer")
       .setDescription("Activa oferta web con precio tachado y banner.")
@@ -1531,6 +1532,8 @@ client.on("interactionCreate", async (interaction) => {
               "`/tablapreciosset`",
               "`/oferta`",
               "`/offeroff`",
+              "`/weboffer`",
+              "`/webofferoff`",
               "`/webprices`",
               "`/keygen` `/keylist` `/keycheck` `/keydel` `/resethwid`",
               "`/compraseveryone`"
@@ -1701,7 +1704,11 @@ client.on("interactionCreate", async (interaction) => {
               .setFooter({ text: "Falcao External • Oferta limitada" })
               .setTimestamp();
             const content = everyone ? "@everyone" : "";
-            await ch.send({ content, embeds: [embed] });
+            const sentMsg = await ch.send({ content, embeds: [embed] });
+            // Save the message ID so /webofferoff can delete it
+            const pricesAfter = readPrices();
+            pricesAfter.offer.announcedMessageId = sentMsg.id;
+            writePrices(pricesAfter);
           }
         } catch (e) {
           console.error("[weboffer] announce error:", e.message);
@@ -1710,6 +1717,79 @@ client.on("interactionCreate", async (interaction) => {
 
       await safeReply(interaction, {
         content: `✅ Oferta web activada: **${pct > 0 ? "+" : ""}${pct}%** durante **${durRaw}**${anunciar ? " · Anunciado en el canal" : ""}.\nLos precios en la web ahora muestran el precio original tachado con el nuevo precio.`
+      });
+      return;
+    }
+
+    if (slashCommand === "webofferoff") {
+      const pricesPayload = readPrices();
+      const offer = pricesPayload.offer || {};
+
+      // Check if there is actually an active web offer
+      const hasActiveOffer = offer.discountPercent && offer.discountPercent !== 0 && offer.isWebOffer;
+      if (!hasActiveOffer) {
+        await safeReply(interaction, { content: "ℹ️ No hay ninguna oferta web activa en este momento." });
+        return;
+      }
+
+      // Try to delete the announcement message from the offer channel
+      const announcedChannel = offer.announcedChannel;
+      const announcedMessageId = offer.announcedMessageId;
+      let deletedMsg = false;
+
+      if (announcedChannel && announcedMessageId) {
+        try {
+          const ch = await client.channels.fetch(announcedChannel).catch(() => null);
+          if (ch && ch.isTextBased()) {
+            const msg = await ch.messages.fetch(announcedMessageId).catch(() => null);
+            if (msg) {
+              await msg.delete();
+              deletedMsg = true;
+            }
+          }
+        } catch (e) {
+          console.error("[webofferoff] Could not delete offer message:", e.message);
+        }
+      }
+
+      // Send an "offer ended" notice to the announcement channel if it was announced
+      if (announcedChannel) {
+        try {
+          const ch = await client.channels.fetch(announcedChannel).catch(() => null);
+          if (ch && ch.isTextBased()) {
+            const embed = new EmbedBuilder()
+              .setColor(0x8a8a9a)
+              .setTitle("⏰ Oferta finalizada")
+              .setDescription("La oferta ha sido desactivada manualmente. Los precios han vuelto a la normalidad.")
+              .setTimestamp(new Date());
+            await ch.send({ embeds: [embed] });
+          }
+        } catch (e) {
+          console.error("[webofferoff] Could not send end notice:", e.message);
+        }
+      }
+
+      // Clear the offer from prices
+      pricesPayload.offer = {
+        discountPercent: 0,
+        durationText: "",
+        endsAt: null,
+        expiredNotified: true,
+        isWebOffer: false,
+        announcedChannel: null,
+        announcedMessageId: null,
+        customMessage: null
+      };
+      writePrices(pricesPayload);
+
+      const details = deletedMsg
+        ? " El mensaje de anuncio ha sido eliminado del canal."
+        : announcedChannel
+          ? " No se pudo eliminar el mensaje de anuncio (puede que ya no exista)."
+          : "";
+
+      await safeReply(interaction, {
+        content: `✅ Oferta web desactivada. Los precios en la web ya no muestran descuento.${details}`
       });
       return;
     }
