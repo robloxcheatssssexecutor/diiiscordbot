@@ -17,35 +17,36 @@
     body{font-family:"Inter",system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh}
 
     /* ── BACKGROUND ── */
-    #heroBg{position:fixed;inset:0;z-index:0;pointer-events:none;background:#050505}
-    #heroBg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.13;filter:saturate(.5) brightness(.7)}
+    #heroBg{position:fixed;inset:0;z-index:0;pointer-events:none;background:#06040a}
+    #heroBg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.18;filter:saturate(.6) brightness(.55)}
     #heroBg::after{content:'';position:absolute;inset:0;
-      background:linear-gradient(to bottom,rgba(5,5,5,.4) 0%,rgba(5,5,5,.65) 50%,rgba(5,5,5,1) 100%)}
+      background:linear-gradient(to bottom,rgba(6,4,10,.3) 0%,rgba(6,4,10,.6) 55%,rgba(6,4,10,1) 100%)}
 
     /* ── NAVBAR ── */
-    .nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
-      display:flex;align-items:center;justify-content:space-between;
-      padding:0 32px;background:rgba(10,10,10,.85);
-      backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06)}
-    .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:800;font-size:.95rem;letter-spacing:-.01em}
-    .nav-logo img{width:52px;height:52px;border-radius:0;object-fit:contain}
-    .nav-links{display:flex;align-items:center;gap:4px}
-    .nav-link{text-decoration:none;color:var(--muted);font-size:.82rem;font-weight:500;
-      padding:6px 13px;border-radius:8px;transition:color .15s,background .15s;cursor:pointer;background:none;border:none;font-family:inherit}
-    .nav-link:hover{color:var(--text);background:rgba(255,255,255,.06)}
-    .nav-link.active{color:var(--text);font-weight:600}
-    .nav-right{display:flex;align-items:center;gap:8px}
-    .btn-dashboard{background:var(--accent);color:#fff;font-size:.82rem;font-weight:700;
-      padding:8px 18px;border-radius:9px;text-decoration:none;transition:opacity .15s,transform .12s;border:none;cursor:pointer;font-family:inherit}
-    .btn-dashboard:hover{opacity:.88;transform:translateY(-1px)}
+    .nav{position:fixed;top:0;left:0;right:0;z-index:200;height:62px;
+      display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+      padding:0 24px;background:rgba(6,4,10,.88);
+      backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07)}
+    .nav-logo{display:flex;align-items:center;text-decoration:none;justify-self:start}
+    .nav-logo img{width:72px;height:72px;border-radius:0;object-fit:contain;filter:drop-shadow(0 0 8px rgba(232,88,34,.4))}
+    .nav-links{display:flex;align-items:center;gap:2px;justify-self:center}
+    .nav-link{text-decoration:none;color:var(--muted);font-size:.83rem;font-weight:500;
+      padding:7px 14px;border-radius:8px;transition:color .15s,background .15s;cursor:pointer;background:none;border:none;font-family:inherit;white-space:nowrap}
+    .nav-link:hover{color:var(--text);background:rgba(255,255,255,.07)}
+    .nav-link.active{color:var(--accent);font-weight:700}
+    .nav-right{display:flex;align-items:center;gap:8px;justify-self:end}
     .nav-avatar{display:flex;align-items:center;gap:7px;text-decoration:none;color:var(--text);
       font-size:.8rem;font-weight:600;padding:4px 10px 4px 4px;border-radius:999px;
       background:rgba(255,255,255,.06);border:1px solid var(--stroke)}
     .nav-avatar img{width:26px;height:26px;border-radius:50%}
+    .nav-login-btn{color:var(--muted);font-size:.82rem;font-weight:500;padding:7px 13px;
+      border-radius:8px;border:1px solid var(--stroke);background:rgba(255,255,255,.04);
+      text-decoration:none;transition:color .13s,background .13s}
+    .nav-login-btn:hover{color:var(--text);background:rgba(255,255,255,.08)}
 
     /* ── PAGES ── */
     .page-wrap{position:relative;z-index:1}
-    .page{display:none;min-height:100vh;padding-top:58px}
+    .page{display:none;min-height:100vh;padding-top:62px}
     .page.active{display:block}
 
     /* ── HERO ── */
@@ -256,7 +257,7 @@
   </style>
 </head>
 <body>
-<div id="heroBg"><img src="https://i.imgur.com/zNPRXMj.jpg" alt="" onerror="this.style.display='none'"/></div>
+<div id="heroBg"><img src="https://i.imgur.com/8XTME0J.jpg" alt="" onerror="this.style.display='none'"/></div>
 
 <!-- NAVBAR -->
 <nav class="nav">
@@ -267,10 +268,10 @@
     <button class="nav-link" onclick="nav('purchase')">Purchase</button>
     <button class="nav-link" onclick="nav('features')">Features</button>
     <button class="nav-link" onclick="nav('dashboard')">Dashboard</button>
-    <button class="nav-link" id="manageNavBtn" style="display:none" onclick="window.location.href='/manage'">Manage</button>
+    <button class="nav-link" id="manageNavBtn" style="display:none" onclick="nav('manage')">Manage</button>
   </div>
   <div class="nav-right" id="navRight">
-    <button class="btn-dashboard" onclick="nav('dashboard')">Open Dashboard</button>
+    <a class="nav-login-btn" href="/api/account/auth/login">Login</a>
   </div>
 </nav>
 
@@ -384,6 +385,19 @@
 <!-- page-pricing alias so old links still work -->
 <div class="page" id="page-pricing" style="display:none"></div>
 
+<!-- ══════════════ MANAGE ══════════════ -->
+<div class="page" id="page-manage">
+  <div class="section">
+    <div class="container" id="manageContent">
+      <div class="login-cta">
+        <h2>Panel de Administración</h2>
+        <p>Solo accesible para administradores.</p>
+        <a class="btn-discord" href="/manage">Ir al panel admin completo →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ DASHBOARD ══════════════ -->
 <div class="page" id="page-dashboard">
   <div class="section">
@@ -418,14 +432,17 @@ let selectedCrypto = 'ltc';
 // ── Navigation ─────────────────────────────────────────────────────────────
 function nav(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.textContent.toLowerCase() === id));
-  const pg = document.getElementById('page-' + id);
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.textContent.trim().toLowerCase() === id));
+  // pricing is alias → show purchase page
+  const pageId = (id === 'pricing') ? 'purchase' : id;
+  const pg = document.getElementById('page-' + pageId);
   if (pg) pg.classList.add('active');
   history.replaceState(null, '', id === 'home' ? '/' : '/?tab=' + id);
   if (id === 'pricing' || id === 'purchase') renderPricing(id);
   if (id === 'dashboard') { dashTab('profile'); }
   if (id === 'settings') { nav('dashboard'); dashTab('settings'); return; }
   if (id === 'referrals') { nav('dashboard'); dashTab('referrals'); return; }
+  if (id === 'manage') renderManage();
 }
 
 function dashTab(tabId) {
@@ -987,6 +1004,29 @@ async function generateRefCode() {
 }
 
 // ── AUTH INIT ──────────────────────────────────────────────────────────────
+async function renderManage() {
+  const ct = document.getElementById('manageContent');
+  if (!ct) return;
+  if (!currentUser) {
+    ct.innerHTML = `<div class="login-cta"><h2>Acceso denegado</h2><p>Debes iniciar sesión como administrador.</p><a class="btn-discord" href="/api/account/auth/login">Iniciar sesión con Discord</a></div>`;
+    return;
+  }
+  try {
+    const ar = await api(`/api/manage/is-admin?discordId=${encodeURIComponent(currentUser.discordId)}`);
+    if (!ar.isAdmin) {
+      ct.innerHTML = `<div class="login-cta"><h2>Sin permisos</h2><p>No tienes acceso al panel de administración.</p></div>`;
+      return;
+    }
+  } catch (_) {}
+  // Embed the manage page in an iframe
+  ct.innerHTML = `
+    <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+      <h2 style="font-size:1.1rem;font-weight:700">Panel Admin</h2>
+      <a href="/manage" target="_blank" style="color:var(--accent);font-size:.82rem;text-decoration:none;border:1px solid rgba(232,88,34,.3);padding:6px 13px;border-radius:8px">Abrir en ventana completa ↗</a>
+    </div>
+    <iframe src="/manage" style="width:100%;height:calc(100vh - 200px);border:1px solid var(--stroke);border-radius:14px;background:var(--card)" title="Admin Panel"></iframe>`;
+}
+
 async function initAuth() {
   const navRight = document.getElementById('navRight');
   try {
@@ -999,7 +1039,7 @@ async function initAuth() {
           <img src="${avatar}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
           ${status.discordUsername}
         </a>`;
-      // Check admin
+      // Check admin — show Manage tab
       try {
         const ar = await api(`/api/manage/is-admin?discordId=${encodeURIComponent(status.discordId)}`);
         const manageBtn = document.getElementById('manageNavBtn');
@@ -1007,12 +1047,10 @@ async function initAuth() {
       } catch (_) {}
     } else {
       currentUser = null;
-      navRight.innerHTML = `
-        <a href="/api/account/auth/login" style="color:var(--muted);font-size:.82rem;font-weight:500;padding:7px 12px;border-radius:8px;border:1px solid var(--stroke);background:rgba(255,255,255,.04);text-decoration:none">Login</a>
-        <button class="btn-dashboard" onclick="nav('purchase')">Purchase Now</button>`;
+      navRight.innerHTML = `<a class="nav-login-btn" href="/api/account/auth/login">Login</a>`;
     }
   } catch (_) {
-    navRight.innerHTML = `<button class="btn-dashboard" onclick="nav('purchase')">Purchase Now</button>`;
+    navRight.innerHTML = `<a class="nav-login-btn" href="/api/account/auth/login">Login</a>`;
   }
 }
 
