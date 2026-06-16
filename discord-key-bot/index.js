@@ -285,7 +285,12 @@ function readPrices() {
         discountPercent: Number(parsed.offer.discountPercent || 0),
         durationText: parsed.offer.durationText || "",
         endsAt: parsed.offer.endsAt || null,
-        expiredNotified: !!parsed.offer.expiredNotified
+        expiredNotified: !!parsed.offer.expiredNotified,
+        // Preserve weboffer-specific fields so they survive restarts
+        isWebOffer: !!parsed.offer.isWebOffer,
+        announcedChannel: parsed.offer.announcedChannel || null,
+        announcedMessageId: parsed.offer.announcedMessageId || null,
+        customMessage: parsed.offer.customMessage || null
       }
     };
   }
@@ -298,7 +303,11 @@ function readPrices() {
       discountPercent: 0,
       durationText: "",
       endsAt: null,
-      expiredNotified: false
+      expiredNotified: false,
+      isWebOffer: false,
+      announcedChannel: null,
+      announcedMessageId: null,
+      customMessage: null
     }
   };
 }
@@ -1372,11 +1381,12 @@ client.once("ready", async () => {
       )
   ].map((cmd) => cmd.toJSON());
 
-  client.application.commands.set(slashCommands).catch((error) => {
-    console.error("Could not register global slash commands:", error.message);
+  // Clear global commands to avoid duplicates (guild commands are instant and preferred)
+  client.application.commands.set([]).catch((error) => {
+    console.error("Could not clear global slash commands:", error.message);
   });
 
-  // Also register as guild commands for instant availability (guild commands update immediately)
+  // Register only as guild commands for instant availability (no duplicates)
   const GUILD_ID = "1502005944945741864";
   try {
     const guild = await client.guilds.fetch(GUILD_ID);
@@ -1726,9 +1736,9 @@ client.on("interactionCreate", async (interaction) => {
       const offer = pricesPayload.offer || {};
 
       // Check if there is actually an active web offer
-      const hasActiveOffer = offer.discountPercent && offer.discountPercent !== 0 && offer.isWebOffer;
+      const hasActiveOffer = offer.discountPercent && offer.discountPercent !== 0 && offer.endsAt && !offer.expiredNotified;
       if (!hasActiveOffer) {
-        await safeReply(interaction, { content: "ℹ️ No hay ninguna oferta web activa en este momento." });
+        await safeReply(interaction, { content: "ℹ️ No hay ninguna oferta activa en este momento." });
         return;
       }
 
