@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Falcao External — Showcase</title>
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png"/>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --bg:#0c0c10;--window:#121217;--section-bg:#0f0f14;--sidebar:#0f0f14;
+      --stroke:#28283300;--stroke2:#2a2a38;--text:#e8e8ee;--muted:#7a7a8a;
+      --accent:#e85822;--accent2:rgba(232,88,34,.18);--widget:#1c1c26;
+      --ok:#3ecf6a;--header-h:46px;--sidebar-w:148px;--radius:12px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100vh;font-family:"Instrument Sans",system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+
+    /* PAGE FRAME */
+    .page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px 16px 60px;position:relative;z-index:1}
+    #bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.35}
+    .back-btn{position:fixed;top:14px;left:14px;z-index:50;background:rgba(18,18,23,.9);border:1px solid var(--stroke2);border-radius:10px;padding:7px 13px;text-decoration:none;color:var(--muted);font-size:.8rem;font-weight:600;transition:color .13s}
+    .back-btn:hover{color:var(--text)}
+
+    /* WINDOW */
+    .menu-window{
+      width:min(800px,96vw);
+      background:var(--window);
+      border:1px solid var(--stroke2);
+      border-radius:var(--radius);
+      overflow:hidden;
+      box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(232,88,34,.06);
+      display:flex;flex-direction:column;
+    }
+
+    /* HEADER */
+    .menu-header{
+      height:var(--header-h);
+      background:#0f0f14;
+      border-bottom:1px solid var(--stroke2);
+      display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;
+    }
+    .header-logo{width:32px;height:32px;border-radius:8px;object-fit:contain;margin-right:2px}
+    .header-title{font-size:.82rem;font-weight:700;color:var(--text)}
+    .header-search{flex:1;max-width:200px;background:var(--widget);border:1px solid var(--stroke2);border-radius:8px;padding:5px 10px;font:inherit;font-size:.78rem;color:var(--text);outline:none}
+    .header-search::placeholder{color:var(--muted)}
+    .header-spacer{flex:1}
+    .header-icon{width:28px;height:28px;background:var(--widget);border:1px solid var(--stroke2);border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.75rem;color:var(--muted);transition:color .13s,border-color .13s}
+    .header-icon:hover{color:var(--text);border-color:var(--accent)}
+    .header-status{font-size:.72rem;color:var(--ok);margin-left:6px;white-space:nowrap}
+
+    /* BODY */
+    .menu-body{display:flex;flex:1;min-height:380px}
+
+    /* SIDEBAR */
+    .sidebar{
+      width:var(--sidebar-w);flex-shrink:0;
+      background:var(--sidebar);
+      border-right:1px solid var(--stroke2);
+      padding:8px 0;overflow-y:auto;
+    }
+    .sidebar::-webkit-scrollbar{width:3px}
+    .sidebar::-webkit-scrollbar-thumb{background:var(--stroke2);border-radius:4px}
+    .group-header{
+      display:flex;align-items:center;gap:7px;
+      padding:7px 10px 7px 12px;
+      cursor:pointer;font-size:.76rem;font-weight:600;color:var(--muted);
+      border-radius:8px;margin:0 4px;transition:background .13s,color .13s;
+      user-select:none;
+    }
+    .group-header:hover,.group-header.open{color:var(--text);background:rgba(255,255,255,.04)}
+    .group-header.open{color:var(--accent)}
+    .group-icon{font-size:.9rem;width:18px;text-align:center}
+    .group-arrow{margin-left:auto;font-size:.6rem;transition:transform .2s}
+    .group-header.open .group-arrow{transform:rotate(90deg)}
+    .sub-items{overflow:hidden;max-height:0;transition:max-height .22s ease}
+    .sub-items.open{max-height:300px}
+    .sub-item{
+      padding:6px 10px 6px 30px;font-size:.74rem;cursor:pointer;
+      color:var(--muted);border-radius:7px;margin:1px 4px;
+      transition:background .12s,color .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .sub-item:hover{background:rgba(255,255,255,.05);color:var(--text)}
+    .sub-item.active{background:rgba(232,88,34,.13);color:var(--accent);font-weight:600}
+
+    /* CONTENT */
+    .content{flex:1;padding:10px 12px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start}
+    .content::-webkit-scrollbar{width:3px}
+    .content::-webkit-scrollbar-thumb{background:var(--stroke2);border-radius:4px}
+
+    /* CHILD PANELS */
+    .child{
+      background:var(--section-bg);border:1px solid var(--stroke2);
+      border-radius:10px;padding:10px 12px;min-width:180px;flex:1;min-height:80px;
+    }
+    .child-title{font-size:.69rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+    .child-title span{color:var(--accent)}
+
+    /* WIDGETS */
+    .w-row{display:flex;align-items:center;padding:4px 0;gap:8px;min-height:26px}
+    .w-label{font-size:.76rem;color:var(--text);flex:1}
+    .w-sub{font-size:.7rem;color:var(--muted)}
+    /* checkbox */
+    .cb{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--stroke2);background:var(--widget);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .12s,border-color .12s}
+    .cb.on{background:var(--accent);border-color:var(--accent)}
+    .cb.on::after{content:"✓";font-size:.6rem;color:#fff;font-weight:700}
+    /* slider */
+    .slider-track{flex:1;height:4px;background:var(--widget);border-radius:4px;position:relative;cursor:pointer;max-width:120px}
+    .slider-fill{height:100%;background:var(--accent);border-radius:4px;width:45%}
+    .slider-thumb{position:absolute;right:calc(55% - 5px);top:-4px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid var(--accent);pointer-events:none}
+    .slider-val{font-size:.68rem;color:var(--muted);min-width:28px;text-align:right}
+    /* dropdown */
+    .dropdown{background:var(--widget);border:1px solid var(--stroke2);border-radius:6px;padding:3px 8px;font:inherit;font-size:.73rem;color:var(--text);min-width:90px;appearance:none;cursor:pointer}
+    /* color dot */
+    .clr-dot{width:13px;height:13px;border-radius:3px;border:1px solid var(--stroke2);flex-shrink:0;cursor:pointer}
+    /* btn */
+    .w-btn{background:var(--accent2);border:1px solid rgba(232,88,34,.3);color:var(--accent);border-radius:6px;padding:3px 10px;font:inherit;font-size:.72rem;font-weight:600;cursor:pointer}
+
+    /* SECTION LABEL */
+    .section-empty{color:var(--muted);font-size:.8rem;padding:20px;text-align:center;width:100%}
+  </style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<a class="back-btn" href="/">← Volver</a>
+
+<div class="page">
+  <div class="menu-window">
+    <!-- HEADER -->
+    <div class="menu-header">
+      <img class="header-logo" src="https://i.imgur.com/5QMzCva.png" alt="logo" onerror="this.src='https://i.imgur.com/lst2PVm.png'"/>
+      <span class="header-title">Falcao External</span>
+      <input class="header-search" placeholder="Search..." readonly/>
+      <div class="header-spacer"></div>
+      <div class="header-icon">ℹ</div>
+      <div class="header-icon" style="margin-left:4px">⚙</div>
+      <span class="header-status">● Sin detección</span>
+    </div>
+
+    <div class="menu-body">
+      <!-- SIDEBAR -->
+      <div class="sidebar" id="sidebar"></div>
+      <!-- CONTENT -->
+      <div class="content" id="content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constellation ─────────────────────────────────────────────────────────
+(function(){
+  const c=document.getElementById("bgCanvas"),ctx=c.getContext("2d");
+  let w,h,pts;
+  function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;pts=Array.from({length:36},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3}));}
+  function tick(){ctx.clearRect(0,0,w,h);for(const p of pts){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1;}for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);if(d<130){ctx.strokeStyle=`rgba(232,88,34,${(1-d/130)*.18})`;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();}}ctx.fillStyle="rgba(232,88,34,.55)";ctx.beginPath();ctx.arc(pts[i].x,pts[i].y,1.5,0,Math.PI*2);ctx.fill();}requestAnimationFrame(tick);}
+  resize();window.addEventListener("resize",resize);tick();
+})();
+
+// ── Widget helpers ─────────────────────────────────────────────────────────
+function cb(label,on=false,color=null){
+  const row=document.createElement("div");row.className="w-row";
+  const box=document.createElement("div");box.className="cb"+(on?" on":"");
+  box.onclick=()=>box.classList.toggle("on");
+  const lbl=document.createElement("span");lbl.className="w-label";lbl.textContent=label;
+  row.append(box,lbl);
+  if(color){const dot=document.createElement("div");dot.className="clr-dot";dot.style.background=color;row.append(dot);}
+  return row;
+}
+function slider(label,val=45,max=100,unit=""){
+  const row=document.createElement("div");row.className="w-row";
+  const lbl=document.createElement("span");lbl.className="w-label";lbl.textContent=label;
+  const track=document.createElement("div");track.className="slider-track";
+  const fill=document.createElement("div");fill.className="slider-fill";fill.style.width=(val/max*100)+"%";
+  const thumb=document.createElement("div");thumb.className="slider-thumb";thumb.style.right=`calc(${100-val/max*100}% - 5px)`;
+  const valEl=document.createElement("span");valEl.className="slider-val";valEl.textContent=val+unit;
+  track.append(fill,thumb);row.append(lbl,track,valEl);
+  return row;
+}
+function dropdown(label,options,sel=0){
+  const row=document.createElement("div");row.className="w-row";
+  const lbl=document.createElement("span");lbl.className="w-label";lbl.textContent=label;
+  const sel_=document.createElement("select");sel_.className="dropdown";
+  options.forEach((o,i)=>{const op=document.createElement("option");op.textContent=o;if(i===sel)op.selected=true;sel_.append(op);});
+  row.append(lbl,sel_);return row;
+}
+function btn(label){
+  const row=document.createElement("div");row.className="w-row";
+  const b=document.createElement("button");b.className="w-btn";b.textContent=label;
+  row.append(b);return row;
+}
+function child(title,icon,items){
+  const c=document.createElement("div");c.className="child";
+  const t=document.createElement("div");t.className="child-title";
+  t.innerHTML=`<span>${icon}</span> ${title}`;
+  c.append(t,...items);return c;
+}
+
+// ── Sections data ──────────────────────────────────────────────────────────
+const SECTIONS = {
+  // 0 - Aimbot
+  0:[
+    child("Activar","🎯",[
+      cb("Activar Aimbot",true),
+      cb("Mostrar Línea del Objetivo"),
+      cb("Mostrar FOV del Aimbot"),
+      cb("Apuntar a NPCs"),
+    ]),
+    child("Configurar","⚙",[
+      cb("Verificar Visibilidad",true),
+      dropdown("Objetivo (Hueso)",["Cabeza","Cuello","Pecho","Pelvis"],0),
+      slider("Distancia Máxima",500,1000,""),
+      slider("Campo de Visión (FOV)",90,360,""),
+      slider("Suavizado",30,100,""),
+    ]),
+  ],
+  // 1 - Silent Aim
+  1:[
+    child("Activar","🎯",[
+      cb("Silent Aim (Invisible)",true),
+      cb("Mostrar FOV del Silent"),
+      cb("Disparo Automático"),
+      cb("Solo Vivos",true),
+      cb("Hueso Más Cercano"),
+    ]),
+    child("Configurar","⚙",[
+      slider("FOV del Silent",120,360,""),
+      slider("Distancia Máxima",300,500,""),
+      dropdown("Hitbox",["Cabeza","Cuello","Pecho","Pelvis"],0),
+      cb("Verificar Visibilidad",true),
+      cb("Apuntar a NPCs"),
+      slider("Probabilidad de Error",0,100,"%"),
+    ]),
+  ],
+  // 2 - Bala Mágica
+  2:[
+    child("Activar","💥",[
+      cb("Bala Mágica (Atraviesa)",true),
+      cb("Mostrar FOV de Magic Bullet"),
+    ]),
+    child("Configurar","⚙",[
+      slider("FOV de Magic Bullet",150,360,""),
+      slider("Distancia máxima",300,500,""),
+      dropdown("Hitbox",["Cabeza","Cuello","Pecho","Pelvis"],0),
+      cb("Verificar visibilidad",true),
+      cb("Apuntar a NPCs"),
+    ]),
+  ],
+  // 3 - TriggerBot
+  3:[
+    child("Activar","⚡",[
+      cb("Activar Triggerbot",true),
+      cb("Disparar a NPCs"),
+      cb("Verificar Visibilidad",true),
+      cb("Disparar detrás de paredes"),
+      cb("Mostrar FOV del Trigger"),
+    ]),
+    child("Configurar","⚙",[
+      slider("FOV del Trigger",60,360,""),
+      slider("Distancia Máxima",400,1000,""),
+      slider("Tiempo de Reacción",80,500,"ms"),
+    ]),
+  ],
+  // 4 - Visuales
+  4:[
+    child("Jugadores","👥",[
+      cb("Activar ESP General",true),
+      cb("Mostrar Local"),
+      cb("Mostrar NPCs"),
+      cb("Mostrar Muertos"),
+      cb("Solo Visibles",true),
+      cb("Caja ESP (Box)",true,"#e85822"),
+      cb("Esqueleto",true,"#3ecf6a"),
+      cb("Nombre del Jugador",true),
+      cb("Barra de Vida",true),
+      cb("Distancia",true),
+      cb("Efecto de Brillo (Glow)"),
+      cb("Cores RGB (Rainbow)"),
+      cb("Estilo Moderno",true),
+    ]),
+    child("Vehículos","🚗",[
+      cb("Activar ESP Vehículos",true),
+      cb("Ignorar Autos Ocupados"),
+      cb("Marcador 3D",true),
+      cb("Mostrar Distancia",true),
+      cb("Mostrar Placa/Nombre",true),
+    ]),
+  ],
+  // 5 - Jugador (Self)
+  5:[
+    child("Movimiento","🏃",[
+      cb("Noclip"),
+      cb("Invisible en Noclip"),
+      cb("Super Salto"),
+      cb("Stamina Infinita",true),
+      slider("Velocidad del Noclip",5,20,""),
+      cb("Jugador Pequeño (Tiny)"),
+    ]),
+    child("Protección","🛡",[
+      cb("Godmode completo",true),
+      cb("Protección contra Headshot",true),
+      cb("Atravesar Paredes"),
+      cb("No Ragdoll",true),
+      cb("Invisible"),
+      cb("Girar Boneco (Anti Aim)"),
+      slider("FOV",90,170,""),
+    ]),
+    child("Acciones","⚡",[
+      slider("Cantidad de Vida",100,200,""),
+      btn("Aplicar Vida"),
+      btn("Teleportar al Waypoint"),
+      btn("Desbloquear Auto Cercano"),
+    ]),
+  ],
+  // 6 - Armas
+  6:[
+    child("Modificadores","🔫",[
+      cb("Munición Infinita",true),
+      cb("Control Balas Dispersadas",true),
+      cb("Control Recoil",true),
+      cb("Recarga Instantánea",true),
+      cb("Modificar Alcance"),
+      cb("Aumento de Daño"),
+      cb("Enable Bullets Bypass"),
+    ]),
+    child("Valores","⚙",[
+      slider("Ajustar Dispersión",0,100,""),
+      slider("Ajustar Recoil",0,100,""),
+      slider("Valor de Alcance",100,200,"%"),
+      slider("Valor de Daño",100,300,"%"),
+      btn("Spawnear arma"),
+    ]),
+  ],
+  // 7 - Vehículos
+  7:[
+    child("Mejoras","🚗",[
+      cb("Activar Tuneo",true),
+      cb("Velocidad del coche"),
+      cb("Grip al suelo (Handling)"),
+      cb("Godmode del Vehículo",true),
+      cb("Nunca Explotar",true),
+      cb("Lanzar Coche"),
+    ]),
+    child("Reparar","🔧",[
+      btn("Reparar Vehículo"),
+      btn("Reparar Motor"),
+      btn("Reparar Tanque de Gasolina"),
+    ]),
+    child("Color","🎨",[
+      cb("Cambiar Color del Vehículo"),
+      cb("Color Primario (Picker)",false,"#e85822"),
+      cb("Color Secundario (Picker)",false,"#222"),
+    ]),
+  ],
+  // 8 - TxAdmin
+  8:[
+    child("TxAdmin","🛠",[
+      cb("Activar modo TxAdmin"),
+    ],[
+      document.createElement("div")
+    ]),
+  ],
+  // 9 - Resources
+  9:[
+    child("Recursos del Servidor","📦",[]),
+  ],
+  // 10 - Lista de Jugadores
+  10:[
+    child("Jugadores conectados","👥",[]),
+  ],
+  // 11 - Lua
+  11:[
+    child("Executor Lua","📝",[
+      btn("Cargar archivo Lua"),
+      btn("Ejecutar script"),
+    ]),
+  ],
+  // 12 - Macros
+  12:[
+    child("Strafe Macro","⚡",[
+      cb("Strafe macro"),
+      dropdown("Patrón",["WASD","SDAW","SAWD","DWAS"],0),
+      dropdown("Modo",["Toggle","Hold"],0),
+      slider("Key hold (ms)",100,500,"ms"),
+      slider("Gap entre teclas (ms)",50,300,"ms"),
+    ]),
+  ],
+  // 13 - Ajustes
+  13:[
+    child("Apariencia","🎨",[
+      cb("Fondo constelación",true),
+      cb("Fondo nieve"),
+      dropdown("Idioma",["English","Español"],1),
+    ]),
+    child("Sistema","⚙",[
+      cb("Modo Seguro",true),
+      cb("Watermark",true),
+      dropdown("Calidad visual",["Performance","Balanced","Crisp"],2),
+      btn("Unload Cheat"),
+    ]),
+  ],
+};
+
+const GROUPS=[
+  {label:"Combate",icon:"✖",sections:[
+    {id:0,name:"Aimbot"},{id:1,name:"Silent"},{id:2,name:"Bala Mágica"},{id:3,name:"TriggerBot"}
+  ]},
+  {label:"Visuales",icon:"👁",sections:[
+    {id:4,name:"Visuales"}
+  ]},
+  {label:"Exploits",icon:"⚡",sections:[
+    {id:5,name:"Jugador"},{id:6,name:"Armas"},{id:7,name:"Vehículos"},{id:8,name:"TxAdmin"}
+  ]},
+  {label:"Miscelánea",icon:"⚙",sections:[
+    {id:9,name:"Resources"},{id:10,name:"Lista"},{id:11,name:"Lua"},{id:12,name:"Macros"},{id:13,name:"Ajustes"}
+  ]},
+];
+
+let activeSection=0;
+let expandedGroup=0;
+
+function buildSidebar(){
+  const sb=document.getElementById("sidebar");
+  sb.innerHTML="";
+  GROUPS.forEach((g,gi)=>{
+    const hdr=document.createElement("div");hdr.className="group-header"+(gi===expandedGroup?" open":"");
+    hdr.innerHTML=`<span class="group-icon">${g.icon}</span><span>${g.label}</span><span class="group-arrow">▶</span>`;
+    hdr.onclick=()=>{expandedGroup=expandedGroup===gi?-1:gi;buildSidebar();};
+    sb.append(hdr);
+
+    const subs=document.createElement("div");subs.className="sub-items"+(gi===expandedGroup?" open":"");
+    g.sections.forEach(s=>{
+      const item=document.createElement("div");item.className="sub-item"+(s.id===activeSection?" active":"");
+      item.textContent=s.name;item.onclick=()=>{activeSection=s.id;buildSidebar();buildContent();};
+      subs.append(item);
+    });
+    sb.append(subs);
+  });
+}
+
+function buildContent(){
+  const ct=document.getElementById("content");
+  ct.innerHTML="";
+  const panels=SECTIONS[activeSection]||[];
+  if(!panels.length){
+    const e=document.createElement("div");e.className="section-empty";e.textContent="Sección vacía en el showcase.";ct.append(e);return;
+  }
+  panels.forEach(p=>ct.append(p.cloneNode(true)));
+  // Re-attach toggle events on clones
+  ct.querySelectorAll(".cb").forEach(cb=>{cb.onclick=()=>cb.classList.toggle("on");});
+}
+
+buildSidebar();buildContent();
+</script>
+</body>
+</html>

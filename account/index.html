@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mi Cuenta – Falcao External</title>
+  <link rel="icon" href="https://i.imgur.com/lst2PVm.png" type="image/png"/>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--bg:#08080c;--card:#121217;--card2:#1a1a22;--stroke:#2a2a35;--text:#e8e8ee;--muted:#8a8a9a;--accent:#e85822;--glow:rgba(232,88,34,.35);--green:#22c55e;--red:#ef4444;--yellow:#eab308}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100vh;font-family:"Instrument Sans",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+    #bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.4}
+    .wrap{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:0 18px 60px}
+
+    /* TOPBAR */
+    .topbar{position:sticky;top:0;z-index:10;background:rgba(8,8,12,.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--stroke);display:flex;align-items:center;padding:0 18px;height:56px;gap:0;margin:0 -18px 0}
+    .logo-link{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--text);font-weight:700;font-size:.95rem;flex-shrink:0}
+    .logo-link img{width:30px;height:30px;border-radius:7px}
+
+    /* NAV TABS inside topbar */
+    .nav-tabs{display:flex;align-items:stretch;gap:0;margin-left:20px;height:56px;flex:1}
+    .nav-tab{display:flex;align-items:center;padding:0 15px;font-size:.83rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:color .15s,border-color .15s;user-select:none;white-space:nowrap;text-decoration:none}
+    .nav-tab:hover{color:var(--text)}
+    .nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+    .topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .avatar-link{display:flex;align-items:center;gap:7px;text-decoration:none;color:var(--text);font-size:.82rem;font-weight:600;padding:4px 10px 4px 4px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--stroke);transition:background .13s}
+    .avatar-link:hover{background:rgba(255,255,255,.08)}
+    .avatar-link img{width:28px;height:28px;border-radius:50%}
+    .auth-btns{display:flex;gap:8px}
+    .auth-btns a{text-decoration:none;font-size:.82rem;font-weight:600;padding:7px 13px;border-radius:9px;transition:opacity .13s}
+    .btn-login{background:rgba(88,101,242,.15);color:#7c8cf8;border:1px solid rgba(88,101,242,.3)}
+    .btn-register{background:#5865f2;color:#fff}
+
+    /* TAB PANELS */
+    .tab-panel{display:none;padding-top:28px}
+    .tab-panel.active{display:block}
+
+    /* USER CARD */
+    .user-card{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:20px 22px;display:flex;align-items:center;gap:16px;margin-bottom:28px}
+    .user-card img{width:52px;height:52px;border-radius:50%;border:2px solid var(--stroke)}
+    .user-info h2{font-size:1.05rem;font-weight:700}
+    .user-info p{font-size:.8rem;color:var(--muted);margin-top:3px}
+    .user-actions{margin-left:auto;display:flex;gap:8px}
+
+    /* KEY CARDS */
+    .section-title{font-size:1rem;font-weight:600;color:var(--accent);margin:0 0 14px}
+    .keys-grid{display:flex;flex-direction:column;gap:12px}
+    .key-card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:18px 20px}
+    .key-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .key-val{font-family:monospace;font-size:.85rem;background:var(--card2);padding:5px 10px;border-radius:8px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.73rem;font-weight:600;white-space:nowrap}
+    .badge-active{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+    .badge-expired{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+    .badge-paused{background:rgba(234,179,8,.15);color:var(--yellow);border:1px solid rgba(234,179,8,.3)}
+    .badge-plan{background:rgba(232,88,34,.12);color:var(--accent);border:1px solid rgba(232,88,34,.25)}
+    .key-meta{margin-top:10px;font-size:.78rem;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+    .key-meta b{color:var(--text)}
+    .key-downloads{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+
+    /* BTNS */
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;transition:transform .12s,opacity .12s;text-decoration:none;border:none;font-family:inherit}
+    .btn:hover{transform:translateY(-1px);opacity:.88}
+    .btn-accent{background:var(--accent);color:#fff}
+    .btn-secondary{background:var(--card2);color:var(--text);border:1px solid var(--stroke)}
+    .btn-download{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+    .btn-sm{padding:5px 11px;font-size:.78rem}
+    .btn-full{width:100%;justify-content:center;padding:13px}
+
+    /* CLAIM TAB */
+    .claim-card{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:28px;max-width:520px;margin:0 auto}
+    .claim-card h1{font-size:1.3rem;font-weight:700;margin-bottom:6px}
+    .claim-card .sub{color:var(--muted);font-size:.88rem;line-height:1.6;margin-bottom:22px}
+    label{display:block;font-size:.83rem;color:var(--muted);margin-bottom:5px;font-weight:500}
+    input[type=text]{width:100%;background:var(--card2);border:1px solid var(--stroke);color:var(--text);font-family:inherit;font-size:.9rem;padding:12px 13px;border-radius:10px;outline:none;transition:border-color .14s}
+    input[type=text]:focus{border-color:var(--accent)}
+    input::placeholder{color:var(--muted)}
+    .msg{margin-top:13px;padding:11px 13px;border-radius:9px;font-size:.85rem;display:none}
+    .msg.ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--green)}
+    .msg.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red)}
+    .success-box{display:none;text-align:center;padding:24px 0 8px}
+    .success-box .icon{font-size:2.8rem;margin-bottom:10px}
+    .success-box h2{font-size:1.15rem;margin-bottom:7px}
+    .success-box p{color:var(--muted);font-size:.87rem}
+
+    /* LOGIN */
+    .login-center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:62vh;text-align:center;gap:20px}
+    .login-center img{width:76px;height:76px;border-radius:18px;box-shadow:0 0 32px var(--glow)}
+    .login-center h1{font-size:1.7rem}
+    .login-center p{color:var(--muted);max-width:400px;line-height:1.6;font-size:.9rem}
+    .discord-btn{background:#5865f2;color:#fff;padding:13px 26px;border-radius:12px;font-size:.95rem;font-weight:700;display:inline-flex;align-items:center;gap:10px;text-decoration:none;transition:transform .14s,box-shadow .14s;box-shadow:0 8px 24px rgba(88,101,242,.4)}
+    .discord-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(88,101,242,.55)}
+
+    /* EMPTY */
+    .empty{text-align:center;padding:44px 20px;color:var(--muted)}
+    .topbar-nav-links{display:flex;align-items:center;gap:4px}
+    .topbar-nav-links a{text-decoration:none;color:var(--muted);font-size:.83rem;padding:6px 11px;border-radius:8px;transition:background .13s,color .13s}
+    .topbar-nav-links a:hover{background:rgba(255,255,255,.06);color:var(--text)}
+    .topbar-sep{width:1px;height:20px;background:var(--stroke);margin:0 4px}
+  </style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div class="wrap">
+  <!-- TOPBAR with inline tabs -->
+  <header class="topbar">
+    <a class="logo-link" href="/"><img src="https://i.imgur.com/lst2PVm.png" alt="logo"/>Falcao External</a>
+    <div class="nav-tabs" id="navTabs">
+      <a href="/" class="nav-tab">Inicio</a>
+      <a href="/panel" class="nav-tab">Panel</a>
+      <span class="nav-tab active" data-tab="keys" onclick="switchTab('keys')">Mi Cuenta</span>
+      <span class="nav-tab" data-tab="claim" onclick="switchTab('claim')">Reclamar Key</span>
+    </div>
+    <div class="topbar-right" id="topbarRight"></div>
+  </header>
+
+  <!-- TAB: Mi Cuenta -->
+  <div class="tab-panel active" id="tab-keys">
+    <div id="keysContent"></div>
+  </div>
+
+  <!-- TAB: Reclamar Key -->
+  <div class="tab-panel" id="tab-claim">
+    <div class="claim-card">
+      <h1>🔑 Reclamar Key</h1>
+      <p class="sub">Vincula tu key a tu cuenta de Discord. Cada key solo puede ser reclamada una vez.</p>
+      <div id="claimInner">
+        <label for="keyInput">Tu Key</label>
+        <input type="text" id="keyInput" placeholder="FALCAO-EXTERNAL-XXXXXX-XXXXXXX" autocomplete="off" spellcheck="false"/>
+        <button class="btn btn-accent btn-full" style="margin-top:13px" id="claimBtn" onclick="claimKey()">Reclamar Key</button>
+        <div class="msg" id="claimMsg"></div>
+      </div>
+      <div class="success-box" id="claimSuccess">
+        <div class="icon">✅</div>
+        <h2>Key reclamada</h2>
+        <p id="claimSuccessText"></p>
+        <button class="btn btn-accent" style="margin-top:14px" onclick="switchTab('keys');loadKeys()">Ver mis keys →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PLAN_LABEL={falcao:"Falcao",temp:"Temp",both:"Both"};
+let currentUser=null;
+
+// ── Constellation ─────────────────────────────────────────────────────────
+(function(){
+  const c=document.getElementById("bgCanvas"),ctx=c.getContext("2d");
+  let w,h,pts;
+  function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;pts=Array.from({length:34},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.32,vy:(Math.random()-.5)*.32}));}
+  function tick(){ctx.clearRect(0,0,w,h);for(const p of pts){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1;}for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);if(d<130){ctx.strokeStyle=`rgba(232,88,34,${(1-d/130)*.18})`;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();}}ctx.fillStyle="rgba(232,88,34,.55)";ctx.beginPath();ctx.arc(pts[i].x,pts[i].y,1.5,0,Math.PI*2);ctx.fill();}requestAnimationFrame(tick);}
+  resize();window.addEventListener("resize",resize);tick();
+})();
+
+// ── Tab switching ─────────────────────────────────────────────────────────
+function switchTab(id){
+  document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".nav-tab[data-tab]").forEach(t=>{
+    t.classList.toggle("active",t.dataset.tab===id);
+  });
+  document.getElementById("tab-"+id).classList.add("active");
+  // Update URL without reload
+  const url=id==="claim"?"/account?tab=claim":"/account";
+  history.replaceState(null,"",url);
+}
+
+// ── API ───────────────────────────────────────────────────────────────────
+async function api(url,opts={}){
+  const res=await fetch(url,{headers:{"Content-Type":"application/json"},...opts});
+  return res.json();
+}
+
+function fmtDate(iso){if(!iso)return "—";return new Date(iso).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric"});}
+function daysLeft(iso){if(!iso)return null;const diff=new Date(iso).getTime()-Date.now();if(diff<=0)return 0;return Math.ceil(diff/86400000);}
+function statusBadge(s){const m={active:["badge-active","🟢"],expired:["badge-expired","🔴"],paused:["badge-paused","🟡"]};const[cls,dot]=m[s]||["badge-paused","⚪"];return `<span class="badge ${cls}">${dot} ${s}</span>`;}
+function copyToClipboard(text){navigator.clipboard.writeText(text).catch(()=>{});}
+
+function renderKeyCard(k){
+  const days=daysLeft(k.expiresAt);
+  const daysHtml=k.expiresAt
+    ?(days===0?`<span style="color:var(--red)">Expirada</span>`:`<span>${days} días restantes</span>`)
+    :`<span>Lifetime</span>`;
+  let dlHtml="";
+  if(k.canDownload&&k.loaders&&k.loaders.length){
+    dlHtml=k.loaders.map(l=>`<a class="btn btn-download btn-sm" href="/api/account/download/${l}" download>⬇ Loader ${PLAN_LABEL[l]||l}</a>`).join("");
+  }else if(k.status!=="active"){
+    dlHtml=`<span style="font-size:.78rem;color:var(--muted)">Key ${k.status} – sin descarga</span>`;
+  }else{
+    dlHtml=`<span style="font-size:.78rem;color:var(--muted)">Loader no disponible aún</span>`;
+  }
+  return `<div class="key-card">
+    <div class="key-row">
+      <span class="key-val" title="${k.key}">${k.key}</span>
+      <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${k.key}')">📋</button>
+      ${statusBadge(k.status)}
+      <span class="badge badge-plan">${PLAN_LABEL[k.plan]||k.plan}</span>
+    </div>
+    <div class="key-meta">
+      <span>Expira: <b>${fmtDate(k.expiresAt)}</b></span>
+      <span>${daysHtml}</span>
+      ${k.firstLoginAt?`<span>Primer uso: <b>${fmtDate(k.firstLoginAt)}</b></span>`:""}
+    </div>
+    <div class="key-downloads">${dlHtml}</div>
+  </div>`;
+}
+
+async function loadKeys(){
+  const ct=document.getElementById("keysContent");
+  if(!currentUser){
+    ct.innerHTML=`<div class="login-center">
+      <img src="https://i.imgur.com/lst2PVm.png" alt="logo"/>
+      <h1>Mi Cuenta</h1>
+      <p>Inicia sesión con Discord para ver tus keys y descargar loaders.</p>
+      <a class="discord-btn" href="/api/account/auth/login">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+        Continuar con Discord
+      </a>
+    </div>`;
+    return;
+  }
+  const keysData=await api("/api/account/keys");
+  const keys=keysData.keys||[];
+  const keysHtml=keys.length===0
+    ?`<div class="empty"><span style="font-size:2rem">🔑</span><p style="margin-top:8px;color:var(--muted)">No tienes ninguna key reclamada.<br><span style="color:var(--accent);cursor:pointer" onclick="switchTab('claim')">Reclamar una key →</span></p></div>`
+    :keys.map(renderKeyCard).join("");
+  ct.innerHTML=`
+    <div class="user-card">
+      <img src="${currentUser.discordAvatar}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
+      <div class="user-info">
+        <h2>${currentUser.discordUsername}</h2>
+        <p>Discord ID: ${currentUser.discordId}</p>
+      </div>
+      <div class="user-actions">
+        <button class="btn btn-secondary btn-sm" id="logoutBtn">Salir</button>
+      </div>
+    </div>
+    <p class="section-title">🔑 Mis Keys</p>
+    <div class="keys-grid">${keysHtml}</div>`;
+  document.getElementById("logoutBtn")?.addEventListener("click",async()=>{
+    await api("/api/account/auth/logout",{method:"POST"});
+    window.location.reload();
+  });
+}
+
+// ── Claim ─────────────────────────────────────────────────────────────────
+function showClaimMsg(text,ok){
+  const el=document.getElementById("claimMsg");
+  el.textContent=text;el.className="msg "+(ok?"ok":"err");el.style.display="block";
+}
+async function claimKey(){
+  const key=document.getElementById("keyInput").value.trim();
+  if(!key){showClaimMsg("Introduce tu key primero.",false);return;}
+  const btn=document.getElementById("claimBtn");
+  btn.disabled=true;btn.textContent="Reclamando...";
+  try{
+    const data=await api("/api/account/claim",{method:"POST",body:JSON.stringify({key})});
+    if(data.ok){
+      document.getElementById("claimInner").style.display="none";
+      document.getElementById("claimSuccess").style.display="block";
+      document.getElementById("claimSuccessText").textContent=`"${data.key.key}" (plan ${PLAN_LABEL[data.key.plan]||data.key.plan}) vinculada a tu cuenta.`;
+    }else{
+      showClaimMsg(data.message||"Error al reclamar.",false);
+    }
+  }catch(e){showClaimMsg("Error de red.",false);}
+  btn.disabled=false;btn.textContent="Reclamar Key";
+}
+document.getElementById("keyInput")?.addEventListener("keydown",e=>{if(e.key==="Enter")claimKey();});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+async function init(){
+  const tr=document.getElementById("topbarRight");
+  const status=await api("/api/account/auth/status");
+
+  // Check manage/admin status
+  let isAdmin=false;
+  try{
+    const mres=await fetch("/api/manage/auth/status");
+    const mdata=await mres.json();
+    isAdmin=!!mdata.authenticated;
+  }catch(_){}
+
+  const manageLink=isAdmin
+    ?`<span class="topbar-sep"></span><a href="/manage" style="color:var(--muted);font-size:.8rem">Manage</a>`
+    :"";
+
+  if(status.authenticated){
+    currentUser=status;
+    tr.innerHTML=`<div class="topbar-nav-links">${manageLink}</div>
+    <a class="avatar-link" href="/account">
+      <img src="${status.discordAvatar}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
+      ${status.discordUsername}
+    </a>`;
+    // Show claim tab if not logged out
+    document.querySelector('[data-tab="claim"]').style.display="flex";
+  }else{
+    currentUser=null;
+    tr.innerHTML=`<div class="topbar-nav-links">${manageLink}</div>
+    <div class="auth-btns">
+      <a class="btn-login" href="/api/account/auth/login">Iniciar sesión</a>
+      <a class="btn-register" href="/api/account/auth/login">Registrarse</a>
+    </div>`;
+    // Hide claim tab for unauthenticated
+    document.querySelector('[data-tab="claim"]').style.display="none";
+  }
+  // Check if URL has ?tab=claim
+  const tab=new URLSearchParams(location.search).get("tab");
+  if(tab==="claim"&&currentUser) switchTab("claim");
+  await loadKeys();
+}
+
+init();
+</script>
+</body>
+</html>

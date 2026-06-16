@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Falcao External — The #1 FiveM External</title>
+  <link rel="icon" href="https://i.imgur.com/5QMzCva.png" type="image/png"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --bg:#0a0a0a;--card:#111111;--card2:#181818;--stroke:#222222;
+      --text:#ffffff;--muted:#888888;--accent:#e85822;--accent2:#ff6b35;
+      --glow:rgba(232,88,34,.4);--green:#22c55e;--red:#ef4444;--yellow:#eab308;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:"Inter",system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh}
+
+    /* ── BACKGROUND ── */
+    #heroBg{position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:radial-gradient(ellipse at 60% 30%, #1a0a00 0%, #0a0a0a 70%)}
+    #heroBg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.22;filter:saturate(.7)}
+    #heroBg::after{content:'';position:absolute;inset:0;
+      background:linear-gradient(to bottom,rgba(10,10,10,.15) 0%,rgba(10,10,10,.55) 55%,rgba(10,10,10,1) 100%)}
+
+    /* ── NAVBAR ── */
+    .nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
+      display:flex;align-items:center;justify-content:space-between;
+      padding:0 32px;background:rgba(10,10,10,.85);
+      backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06)}
+    .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:800;font-size:.95rem;letter-spacing:-.01em}
+    .nav-logo img{width:28px;height:28px;border-radius:6px}
+    .nav-links{display:flex;align-items:center;gap:4px}
+    .nav-link{text-decoration:none;color:var(--muted);font-size:.82rem;font-weight:500;
+      padding:6px 13px;border-radius:8px;transition:color .15s,background .15s;cursor:pointer;background:none;border:none;font-family:inherit}
+    .nav-link:hover{color:var(--text);background:rgba(255,255,255,.06)}
+    .nav-link.active{color:var(--text);font-weight:600}
+    .nav-right{display:flex;align-items:center;gap:8px}
+    .btn-dashboard{background:var(--accent);color:#fff;font-size:.82rem;font-weight:700;
+      padding:8px 18px;border-radius:9px;text-decoration:none;transition:opacity .15s,transform .12s;border:none;cursor:pointer;font-family:inherit}
+    .btn-dashboard:hover{opacity:.88;transform:translateY(-1px)}
+    .nav-avatar{display:flex;align-items:center;gap:7px;text-decoration:none;color:var(--text);
+      font-size:.8rem;font-weight:600;padding:4px 10px 4px 4px;border-radius:999px;
+      background:rgba(255,255,255,.06);border:1px solid var(--stroke)}
+    .nav-avatar img{width:26px;height:26px;border-radius:50%}
+
+    /* ── PAGES ── */
+    .page-wrap{position:relative;z-index:1}
+    .page{display:none;min-height:100vh;padding-top:58px}
+    .page.active{display:block}
+
+    /* ── HERO ── */
+    .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      text-align:center;padding:80px 20px 60px;position:relative}
+    .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(232,88,34,.12);
+      border:1px solid rgba(232,88,34,.3);color:var(--accent);font-size:.75rem;font-weight:600;
+      padding:5px 13px;border-radius:999px;margin-bottom:22px;letter-spacing:.03em}
+    .hero h1{font-size:clamp(2.8rem,7vw,5.2rem);font-weight:900;line-height:1.05;letter-spacing:-.04em;margin-bottom:10px}
+    .hero h1 span{color:var(--accent)}
+    .hero p{color:var(--muted);font-size:clamp(.9rem,2vw,1.05rem);max-width:480px;margin:0 auto 34px;line-height:1.6}
+    .hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:40px}
+    .btn-hero-primary{background:var(--accent);color:#fff;font-size:.93rem;font-weight:700;
+      padding:13px 28px;border-radius:11px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+      transition:transform .12s,box-shadow .12s;box-shadow:0 8px 32px var(--glow);border:none;cursor:pointer;font-family:inherit}
+    .btn-hero-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px var(--glow)}
+    .btn-hero-secondary{background:rgba(255,255,255,.08);color:var(--text);font-size:.93rem;font-weight:600;
+      padding:13px 28px;border-radius:11px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+      border:1px solid rgba(255,255,255,.12);transition:background .15s}
+    .btn-hero-secondary:hover{background:rgba(255,255,255,.13)}
+    .hero-float{position:absolute;padding:6px 13px;border-radius:999px;font-size:.73rem;font-weight:600;
+      white-space:nowrap;backdrop-filter:blur(8px)}
+    .hf-left1{left:6%;top:38%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--muted)}
+    .hf-left2{left:4%;top:54%;background:rgba(232,88,34,.15);border:1px solid rgba(232,88,34,.3);color:var(--accent)}
+    .hf-left3{left:7%;top:68%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--muted)}
+    .hf-right1{right:6%;top:38%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--muted)}
+    .hf-right2{right:4%;top:54%;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:var(--green)}
+    @media(max-width:640px){.hero-float{display:none}}
+
+    /* ── SECTIONS ── */
+    .section{padding:80px 20px}
+    .container{max-width:960px;margin:0 auto}
+    .section-label{font-size:.72rem;font-weight:700;color:var(--accent);text-transform:uppercase;
+      letter-spacing:.12em;text-align:center;margin-bottom:12px}
+    .section-title{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:900;text-align:center;
+      line-height:1.1;letter-spacing:-.03em;margin-bottom:10px}
+    .section-title span{color:var(--accent)}
+    .section-sub{text-align:center;color:var(--muted);font-size:.88rem;margin-bottom:48px}
+
+    /* ── FEATURES GRID ── */
+    .features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    @media(max-width:700px){.features-grid{grid-template-columns:1fr}}
+    @media(min-width:701px) and (max-width:900px){.features-grid{grid-template-columns:repeat(2,1fr)}}
+    .feat-card{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:26px 22px;transition:border-color .15s}
+    .feat-card:hover{border-color:rgba(232,88,34,.4)}
+    .feat-icon-wrap{width:44px;height:44px;border-radius:10px;background:rgba(232,88,34,.12);
+      display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+    .feat-icon-wrap svg{color:var(--accent)}
+    .feat-card h3{font-size:.95rem;font-weight:700;margin-bottom:7px}
+    .feat-card p{font-size:.8rem;color:var(--muted);line-height:1.6}
+
+    /* ── PRICING ── */
+    .pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+    .price-card{background:var(--card);border:1px solid var(--stroke);border-radius:18px;padding:24px;position:relative;transition:border-color .15s}
+    .price-card.featured{border-color:var(--accent)}
+    .price-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+    .price-card-logo{width:44px;height:44px;border-radius:10px;overflow:hidden;background:#1a1a1a;display:flex;align-items:center;justify-content:center}
+    .price-card-logo img{width:100%;height:100%;object-fit:contain}
+    .price-badges{display:flex;gap:6px;flex-wrap:wrap}
+    .price-badge{font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+    .pb-orange{background:rgba(232,88,34,.15);color:var(--accent);border:1px solid rgba(232,88,34,.3)}
+    .pb-green{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25)}
+    .pb-blue{background:rgba(88,101,242,.12);color:#7c8cf8;border:1px solid rgba(88,101,242,.25)}
+    .price-card h3{font-size:1rem;font-weight:700;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--stroke)}
+    .dur-tabs{display:flex;gap:0;margin-bottom:22px;border-bottom:1px solid var(--stroke)}
+    .dur-tab{flex:1;text-align:center;padding:8px 4px;font-size:.73rem;font-weight:600;color:var(--muted);
+      cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .13s,border-color .13s;text-transform:uppercase;letter-spacing:.05em}
+    .dur-tab.active{color:var(--text);border-bottom-color:var(--accent)}
+    .price-display{margin-bottom:16px}
+    .price-old{font-size:.85rem;color:var(--muted);text-decoration:line-through;margin-right:6px}
+    .price-new{font-size:1.7rem;font-weight:800;letter-spacing:-.03em}
+    .price-per{font-size:.78rem;color:var(--muted);margin-left:4px}
+    .price-discount{display:inline-block;background:#ef4444;color:#fff;font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:middle}
+    .btn-buy{width:100%;padding:13px;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;
+      border:none;font-family:inherit;transition:opacity .13s,transform .12s;margin-bottom:10px}
+    .btn-buy:hover{opacity:.88;transform:translateY(-1px)}
+    .btn-buy-accent{background:var(--accent);color:#fff}
+    .btn-buy-outline{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.2)}
+    .paypal-link{text-align:center;font-size:.75rem;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:5px}
+
+    /* ── DASHBOARD ── */
+    .dash-header{background:var(--card);border:1px solid var(--stroke);border-radius:16px;
+      overflow:hidden;margin-bottom:24px}
+    .dash-banner{height:120px;background:linear-gradient(135deg,#1a0e08,#2d1508);position:relative;overflow:hidden}
+    .dash-banner img{width:100%;height:100%;object-fit:cover;opacity:.35}
+    .dash-banner-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,10,10,.8),transparent)}
+    .dash-user{padding:18px 22px;display:flex;align-items:center;gap:14px}
+    .dash-avatar{width:64px;height:64px;border-radius:50%;border:3px solid var(--accent);
+      margin-top:-40px;position:relative;z-index:2;background:var(--card2)}
+    .dash-user-info h2{font-size:1rem;font-weight:700}
+    .dash-user-info p{font-size:.78rem;color:var(--muted);margin-top:2px}
+    .dash-status-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+      border-radius:999px;font-size:.72rem;font-weight:700;margin-top:4px}
+    .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+    @media(max-width:600px){.dash-grid{grid-template-columns:1fr}}
+    .dash-card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:20px}
+    .dash-card h3{font-size:.85rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px}
+    .key-box{background:var(--card2);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .key-box code{font-size:.8rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+    .key-meta-row{display:flex;gap:14px;font-size:.78rem;color:var(--muted);flex-wrap:wrap}
+    .key-meta-row b{color:var(--text)}
+    .dl-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;
+      font-size:.78rem;font-weight:600;background:rgba(34,197,94,.1);color:var(--green);
+      border:1px solid rgba(34,197,94,.25);text-decoration:none;transition:background .13s;cursor:pointer}
+    .dl-btn:hover{background:rgba(34,197,94,.2)}
+    .login-cta{text-align:center;padding:60px 20px}
+    .login-cta h2{font-size:1.4rem;font-weight:800;margin-bottom:8px}
+    .login-cta p{color:var(--muted);margin-bottom:24px;font-size:.88rem}
+    .btn-discord{background:#5865f2;color:#fff;padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:700;
+      display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:opacity .13s}
+    .btn-discord:hover{opacity:.88}
+
+    /* ── SETTINGS ── */
+    .settings-banner{background:var(--card);border:1px solid var(--stroke);border-radius:16px;
+      overflow:hidden;margin-bottom:24px}
+    .settings-banner-img{height:110px;position:relative;overflow:hidden}
+    .settings-banner-img img{width:100%;height:100%;object-fit:cover;opacity:.4}
+    .settings-user-row{padding:16px 22px;display:flex;align-items:center;gap:14px}
+    .s-avatar{width:58px;height:58px;border-radius:50%;border:2px solid var(--stroke);margin-top:-36px;position:relative;z-index:2}
+    .s-tag{font-size:.75rem;color:var(--accent);font-weight:700;margin-left:6px}
+    .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+    @media(max-width:640px){.settings-grid{grid-template-columns:1fr}}
+    .settings-card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:24px}
+    .settings-card h3{font-size:.95rem;font-weight:700;margin-bottom:6px}
+    .settings-card p{font-size:.8rem;color:var(--muted);line-height:1.5;margin-bottom:18px}
+    .s-input{width:100%;background:var(--card2);border:1px solid var(--stroke);color:var(--text);
+      font-family:inherit;font-size:.85rem;padding:11px 13px;border-radius:10px;outline:none;transition:border-color .14s;margin-bottom:10px}
+    .s-input:focus{border-color:var(--accent)}
+    .s-input::placeholder{color:var(--muted)}
+    .btn-settings{width:100%;padding:11px;border-radius:9px;font-size:.85rem;font-weight:700;
+      cursor:pointer;border:none;font-family:inherit;transition:opacity .13s,transform .12s;color:var(--text)}
+    .btn-settings:hover{opacity:.88;transform:translateY(-1px)}
+    .btn-s-accent{background:var(--accent)}
+    .btn-s-outline{background:var(--card2);border:1px solid var(--stroke)}
+    .s-msg{margin-top:10px;padding:9px 12px;border-radius:8px;font-size:.8rem;display:none}
+    .s-msg.ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--green);display:block}
+    .s-msg.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);display:block}
+    .referral-mini{background:var(--card2);border-radius:12px;padding:20px;text-align:center}
+    .referral-mini h3{font-size:1rem;font-weight:700;margin-bottom:8px}
+    .referral-mini p{font-size:.82rem;color:var(--muted);line-height:1.6;margin-bottom:16px}
+    .referral-mini p b{color:var(--text)}
+
+    /* ── REFERRALS ── */
+    .ref-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+    @media(max-width:600px){.ref-stats{grid-template-columns:repeat(2,1fr)}}
+    .ref-stat{background:var(--card);border:1px solid var(--stroke);border-radius:12px;padding:16px}
+    .ref-stat .label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+    .ref-stat .value{font-size:1.3rem;font-weight:800;color:var(--green)}
+    .ref-link-card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:22px;margin-bottom:16px}
+    .ref-link-card h3{font-size:.9rem;font-weight:700;margin-bottom:4px}
+    .ref-link-card p{font-size:.79rem;color:var(--muted);margin-bottom:16px}
+    .ref-link-box{display:flex;gap:8px;align-items:center;background:var(--card2);border-radius:10px;
+      padding:10px 14px;border:1px solid var(--stroke);margin-bottom:14px}
+    .ref-link-box code{flex:1;font-size:.8rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+    @media(max-width:600px){.steps{grid-template-columns:1fr}}
+    .step{background:var(--card2);border-radius:10px;padding:12px 14px}
+    .step .step-num{font-size:.7rem;color:var(--accent);font-weight:700;margin-bottom:5px}
+    .step .step-title{font-size:.82rem;font-weight:700;margin-bottom:3px}
+    .step .step-desc{font-size:.74rem;color:var(--muted)}
+    .withdraw-card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:22px;margin-bottom:16px}
+    .withdraw-card h3{font-size:.9rem;font-weight:700;margin-bottom:4px}
+    .withdraw-card .sub{font-size:.79rem;color:var(--muted);margin-bottom:16px}
+    .crypto-tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+    .crypto-tab{padding:7px 14px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;
+      border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s}
+    .crypto-tab.active{border-color:var(--accent);background:rgba(232,88,34,.12);color:var(--accent)}
+    .payout-card{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:22px}
+    .payout-card h3{font-size:.9rem;font-weight:700;margin-bottom:16px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:.72rem}
+    .payout-empty{text-align:center;color:var(--muted);padding:24px;font-size:.82rem}
+    .ref-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:680px){.ref-two-col{grid-template-columns:1fr}}
+    .progress-bar{background:var(--card2);border-radius:999px;height:6px;margin-top:6px;overflow:hidden}
+    .progress-fill{height:100%;border-radius:999px;background:var(--accent)}
+    .progress-label{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-top:4px}
+
+    /* ── GENERAL ── */
+    .btn-sm{padding:6px 12px;font-size:.75rem;font-weight:600;border-radius:8px;cursor:pointer;
+      border:none;font-family:inherit;transition:opacity .13s}
+    .btn-copy{background:rgba(255,255,255,.07);color:var(--muted);border:1px solid var(--stroke)}
+    .btn-copy:hover{color:var(--text)}
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:.71rem;font-weight:600}
+    .badge-active{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+    .badge-expired{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+    .badge-paused{background:rgba(234,179,8,.15);color:var(--yellow);border:1px solid rgba(234,179,8,.3)}
+    .empty-state{text-align:center;padding:48px 20px;color:var(--muted);font-size:.85rem}
+    .divider{border:none;border-top:1px solid var(--stroke);margin:24px 0}
+    footer{text-align:center;padding:32px 20px;color:var(--muted);font-size:.75rem;border-top:1px solid var(--stroke)}
+    footer a{color:var(--accent);text-decoration:none}
+    @media(max-width:560px){.nav-links{gap:0}.nav-link{padding:6px 9px;font-size:.75rem}}
+  </style>
+</head>
+<body>
+<div id="heroBg"><img src="https://i.imgur.com/JuXCB5n.jpg" alt="" onerror="this.style.display='none'"/></div>
+
+<!-- NAVBAR -->
+<nav class="nav">
+  <a class="nav-logo" href="#" onclick="nav('home');return false">
+    <img src="https://i.imgur.com/5QMzCva.png" alt="logo"/>
+    Falcao External
+  </a>
+  <div class="nav-links">
+    <button class="nav-link" onclick="nav('pricing')">Pricing</button>
+    <button class="nav-link" onclick="nav('features')">Features</button>
+    <button class="nav-link" onclick="nav('dashboard')">Dashboard</button>
+    <button class="nav-link" onclick="nav('settings')">Settings</button>
+    <button class="nav-link" onclick="nav('referrals')">Referrals</button>
+    <button class="nav-link" onclick="nav('purchase')">Purchase</button>
+  </div>
+  <div class="nav-right" id="navRight">
+    <button class="btn-dashboard" onclick="nav('dashboard')">Open Dashboard</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+<!-- ══════════════ HOME ══════════════ -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <img src="https://i.imgur.com/5QMzCva.png" alt="logo" style="width:min(90px,22vw);border-radius:20px;box-shadow:0 0 48px rgba(232,88,34,.5);margin-bottom:18px"/>
+    <div class="hero-badge">🔥 The #1 FiveM External</div>
+    <h1>The Number ONE<br><span>FiveM EXTERNAL</span></h1>
+    <p>Panel remoto desde tu móvil. ESP, Aimbot, Exploits y más — control total sin límites.</p>
+    <div class="hero-btns">
+      <button class="btn-hero-primary" onclick="nav('purchase')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        Purchase Now
+      </button>
+      <button class="btn-hero-secondary" onclick="nav('dashboard')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+        Open Dashboard
+      </button>
+    </div>
+    <div class="hero-float hf-left1">🔒 Secure</div>
+    <div class="hero-float hf-left2">+ Frequent Updates</div>
+    <div class="hero-float hf-left3">↔ Lua Executor</div>
+    <div class="hero-float hf-right1">🔒 Privacy Protector</div>
+    <div class="hero-float hf-right2">⭐ Best in the Market</div>
+  </div>
+</div>
+
+<!-- ══════════════ FEATURES ══════════════ -->
+<div class="page" id="page-features">
+  <div class="section">
+    <div class="container">
+      <div class="section-label">WHY FALCAO</div>
+      <h2 class="section-title">Falcao External offers..<br><span>a winning solution.</span></h2>
+      <p class="section-sub">Just a small sample of Falcao External features..</p>
+      <div class="features-grid">
+        <div class="feat-card">
+          <div class="feat-icon-wrap">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3>ESP Avanzado</h3>
+          <p>Box ESP, Skeleton, Radar, HealthBar, ArmorBar, WeaponName, Distance, SnapLines y más — todo configurable con colores y estilos.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-wrap">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
+          </div>
+          <h3>Aimbot & Silent Aim</h3>
+          <p>AimBot legit con FOV, smoothing y hitbox configurable. Silent Aim con predicción de movimiento y miss chance.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-wrap">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <h3>Panel desde el Móvil</h3>
+          <p>Controla todas las opciones del cheat desde cualquier dispositivo. Sin instalaciones, solo abre el navegador.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-wrap">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <h3>Exploits & Misc</h3>
+          <p>Noclip, Godmode, Invisible, SuperJump, InfiniteStamina, SpeedBoost, TeleportToWaypoint y más exploits.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-wrap">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3>Stream-proof</h3>
+          <p>Bypass de OBS y capturas de pantalla. Protección de identidad de hardware incluida en todos los planes.</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon-wrap">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <h3>Actualizaciones Frecuentes</h3>
+          <p>Compatibilidad garantizada con las últimas builds de FiveM. Soporte de múltiples versiones del juego.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PRICING ══════════════ -->
+<div class="page" id="page-pricing">
+  <div class="section">
+    <div class="container">
+      <div class="section-label">PLANES</div>
+      <h2 class="section-title">Elige tu <span>plan</span></h2>
+      <p class="section-sub">Sin suscripciones obligatorias. Paga lo que necesitas.</p>
+      <div class="pricing-grid" id="pricingGrid">
+        <div class="price-card" style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Cargando precios...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PURCHASE ══════════════ -->
+<div class="page" id="page-purchase">
+  <div class="section">
+    <div class="container">
+      <div class="section-label">COMPRAR</div>
+      <h2 class="section-title">Obtén tu <span>licencia</span></h2>
+      <p class="section-sub">Pago seguro. Key entregada automáticamente.</p>
+      <div class="pricing-grid" id="purchaseGrid">
+        <div class="price-card" style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Cargando precios...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ DASHBOARD ══════════════ -->
+<div class="page" id="page-dashboard">
+  <div class="section">
+    <div class="container" id="dashContent">
+      <div class="login-cta">
+        <h2>Accede al Dashboard</h2>
+        <p>Inicia sesión con Discord para ver tus keys y gestionar tu licencia.</p>
+        <a class="btn-discord" href="/api/account/auth/login">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+          Continuar con Discord
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ SETTINGS ══════════════ -->
+<div class="page" id="page-settings">
+  <div class="section">
+    <div class="container" id="settingsContent">
+      <div class="login-cta">
+        <h2>Inicia sesión para acceder</h2>
+        <p>Necesitas una cuenta para gestionar tu licencia.</p>
+        <a class="btn-discord" href="/api/account/auth/login">Iniciar sesión con Discord</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ REFERRALS ══════════════ -->
+<div class="page" id="page-referrals">
+  <div class="section">
+    <div class="container" id="referralsContent">
+      <div class="login-cta">
+        <h2>Programa de Referidos</h2>
+        <p>Inicia sesión para acceder a tu programa de referidos.</p>
+        <a class="btn-discord" href="/api/account/auth/login">Iniciar sesión con Discord</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- .page-wrap -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let currentUser = null;
+let pricesCache = null;
+let refCode = null;
+let selectedCrypto = 'ltc';
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function nav(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.textContent.toLowerCase() === id));
+  const pg = document.getElementById('page-' + id);
+  if (pg) pg.classList.add('active');
+  history.replaceState(null, '', id === 'home' ? '/' : '/?tab=' + id);
+  if (id === 'pricing' || id === 'purchase') renderPricing(id);
+  if (id === 'dashboard') renderDashboard();
+  if (id === 'settings') renderSettings();
+  if (id === 'referrals') renderReferrals();
+}
+
+// ── API helper ─────────────────────────────────────────────────────────────
+async function api(url, opts = {}) {
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  return res.json().catch(() => ({}));
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function daysLeft(iso) {
+  if (!iso) return null;
+  const d = new Date(iso).getTime() - Date.now();
+  return d <= 0 ? 0 : Math.ceil(d / 86400000);
+}
+function statusBadge(s) {
+  const m = { active: ['badge-active', '● Active'], expired: ['badge-expired', '● Expired'], paused: ['badge-paused', '● Paused'] };
+  const [cls, label] = m[s] || ['badge-paused', '● ' + s];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+function copy(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) { const o = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = o, 1200); }
+  }).catch(() => {});
+}
+
+// ── PRICING RENDER ─────────────────────────────────────────────────────────
+async function loadPrices() {
+  if (pricesCache) return pricesCache;
+  const data = await api('/api/payments/prices');
+  pricesCache = data;
+  return data;
+}
+
+function buildPriceCard(productId, product, prices, isPurchase) {
+  const isFeatured = productId === 'product1';
+  const plans = [
+    { key: 'week',     label: 'WEEKLY',   days: 7 },
+    { key: 'monthly',  label: 'MONTHLY',  days: 30 },
+    { key: 'lifetime', label: 'LIFETIME', days: 36500 }
+  ];
+  const disc = prices.discountPercent || 0;
+  const cardId = `card-${isPurchase ? 'buy' : 'price'}-${productId}`;
+
+  const tabsHtml = plans.map(p => `
+    <div class="dur-tab${p.key === 'lifetime' ? ' active' : ''}"
+         onclick="switchDurTab('${cardId}','${p.key}')" data-plan="${p.key}">
+      ${p.label}
+    </div>`).join('');
+
+  const plansDataHtml = plans.map(p => {
+    const price = product[p.key];
+    if (typeof price !== 'number') return '';
+    const origPrice = disc > 0 ? Number((price / (1 - disc / 100)).toFixed(2)) : null;
+    const perLabel = p.key === 'lifetime' ? '/ one-time' : p.key === 'monthly' ? '/ month' : '/ week';
+    return `<div class="plan-data" data-plan="${p.key}" style="display:${p.key === 'lifetime' ? 'block' : 'none'}">
+      <div class="price-display" style="margin-bottom:16px">
+        ${origPrice ? `<span class="price-old">€${origPrice}</span>` : ''}
+        <span class="price-new">€${price.toFixed(2)}</span>
+        <span class="price-per">${perLabel}</span>
+        ${origPrice ? `<span class="price-discount">-${disc}%</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const buyBtnHtml = isPurchase ? `
+    <button class="btn-buy ${isFeatured ? 'btn-buy-accent' : 'btn-buy-outline'}"
+            onclick="startPurchase('${productId}', '${cardId}')">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="display:inline;vertical-align:middle;margin-right:5px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+      PURCHASE WITH CARD
+    </button>
+    <div class="paypal-link">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="#003087"><path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.78 4.01-3.443 5.39-6.844 5.39h-.64a.836.836 0 0 0-.826.707l-.99 6.268-.28 1.775a.44.44 0 0 1-.435.373H7.56a.436.436 0 0 1-.43-.507L9.3 12.54a.836.836 0 0 1 .826-.707h2.69c4.403 0 7.455-2.474 8.45-6.5.38-1.533.253-2.802-.2-3.855z"/></svg>
+      or pay with PayPal
+    </div>` : '';
+
+  const badges = isFeatured
+    ? `<span class="price-badge pb-orange">🔒 Best seller</span>`
+    : `<span class="price-badge pb-blue">⚡ Lighter & faster</span><span class="price-badge pb-green">🆕 New release</span>`;
+
+  return `
+    <div class="price-card ${isFeatured ? 'featured' : ''}" id="${cardId}">
+      <div class="price-card-top">
+        <div class="price-card-logo"><img src="https://i.imgur.com/5QMzCva.png" alt="logo"/></div>
+        <div class="price-badges">${badges}</div>
+      </div>
+      <h3>${product.name || 'Plan'}</h3>
+      <div class="dur-tabs">${tabsHtml}</div>
+      ${plansDataHtml}
+      ${buyBtnHtml}
+    </div>`;
+}
+
+function switchDurTab(cardId, planKey) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card.querySelectorAll('.dur-tab').forEach(t => t.classList.toggle('active', t.dataset.plan === planKey));
+  card.querySelectorAll('.plan-data').forEach(d => d.style.display = d.dataset.plan === planKey ? 'block' : 'none');
+}
+
+async function renderPricing(pageId) {
+  const gridId = pageId === 'purchase' ? 'purchaseGrid' : 'pricingGrid';
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  if (grid.dataset.loaded) return;
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Cargando...</div>';
+  try {
+    const data = await loadPrices();
+    const products = data.products || {};
+    const isPurchase = pageId === 'purchase';
+    const cards = Object.entries(products).map(([id, p]) => buildPriceCard(id, p, data, isPurchase)).join('');
+    grid.innerHTML = cards || '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">No hay productos disponibles.</div>';
+    grid.dataset.loaded = '1';
+  } catch (e) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Error cargando precios.</div>';
+  }
+}
+
+async function startPurchase(productId, cardId) {
+  if (!currentUser) {
+    if (confirm('Necesitas iniciar sesión con Discord para comprar. ¿Ir al login?')) {
+      window.location.href = '/api/account/auth/login?redirect=/?tab=purchase';
+    }
+    return;
+  }
+  const card = document.getElementById(cardId);
+  const activePlan = card ? card.querySelector('.dur-tab.active') : null;
+  const durationKey = activePlan ? activePlan.dataset.plan : 'lifetime';
+  const data = await loadPrices();
+  const product = (data.products || {})[productId];
+  if (!product) return;
+  const price = product[durationKey];
+
+  const method = await showPaymentModal(productId, durationKey, price, product.name);
+  if (!method) return;
+
+  try {
+    const order = await api('/api/payments/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        method,
+        plan: productId,
+        durationKey,
+        discordId: currentUser.discordId,
+        discordUsername: currentUser.discordUsername
+      })
+    });
+    if (!order.ok) { alert(order.message || 'Error creando orden.'); return; }
+    if (method === 'stripe' && order.stripeUrl) {
+      window.location.href = order.stripeUrl;
+    } else {
+      window.location.href = '/api/payments/order/' + order.orderId;
+    }
+  } catch (e) {
+    alert('Error de red. Inténtalo de nuevo.');
+  }
+}
+
+function showPaymentModal(productId, durationKey, price, productName) {
+  return new Promise(resolve => {
+    const existing = document.getElementById('payModalBg');
+    if (existing) existing.remove();
+
+    const bg = document.createElement('div');
+    bg.id = 'payModalBg';
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px';
+    const durationLabels = { week: 'Semana', monthly: 'Mensual', lifetime: 'Lifetime' };
+    bg.innerHTML = `
+      <div style="background:#111;border:1px solid #222;border-radius:18px;padding:28px;width:100%;max-width:400px">
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px">Método de pago</h3>
+        <p style="font-size:.8rem;color:#888;margin-bottom:20px">${productName} · ${durationLabels[durationKey] || durationKey} · <b style="color:#fff">€${typeof price === 'number' ? price.toFixed(2) : '?'}</b></p>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="pay-method-btn" data-method="stripe" style="background:#635bff;color:#fff;border:none;border-radius:10px;padding:13px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px">
+            🏦 Pagar con Stripe (Tarjeta)
+          </button>
+          <button class="pay-method-btn" data-method="ltc" style="background:#222;color:#fff;border:1px solid #333;border-radius:10px;padding:13px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px">
+            🪙 Pagar con Litecoin
+          </button>
+          <button class="pay-method-btn" data-method="paypal" style="background:#003087;color:#fff;border:none;border-radius:10px;padding:13px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px">
+            💳 Pagar con PayPal F&amp;F
+          </button>
+        </div>
+        <button onclick="document.getElementById('payModalBg').remove()" style="width:100%;margin-top:12px;background:transparent;color:#666;border:none;font-size:.8rem;cursor:pointer;padding:8px;font-family:inherit">Cancelar</button>
+      </div>`;
+    document.body.appendChild(bg);
+    bg.querySelectorAll('.pay-method-btn').forEach(btn => {
+      btn.onclick = () => { bg.remove(); resolve(btn.dataset.method); };
+    });
+    bg.onclick = e => { if (e.target === bg) { bg.remove(); resolve(null); } };
+  });
+}
+
+// ── DASHBOARD RENDER ───────────────────────────────────────────────────────
+async function renderDashboard() {
+  const ct = document.getElementById('dashContent');
+  if (!ct) return;
+  if (!currentUser) {
+    ct.innerHTML = `<div class="login-cta">
+      <h2>Accede al Dashboard</h2>
+      <p>Inicia sesión con Discord para ver tus keys y gestionar tu licencia.</p>
+      <a class="btn-discord" href="/api/account/auth/login">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+        Continuar con Discord
+      </a>
+    </div>`;
+    return;
+  }
+
+  const keysData = await api('/api/account/keys');
+  const keys = keysData.keys || [];
+  const avatarSrc = currentUser.discordAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png';
+  const firstKey = keys[0];
+  const statusLabel = firstKey ? firstKey.status : 'none';
+  const statusColors = { active: 'var(--green)', expired: 'var(--red)', paused: 'var(--yellow)' };
+
+  const keysHtml = keys.length === 0 ?
+    `<div class="empty-state">🔑 No tienes keys. <span style="color:var(--accent);cursor:pointer" onclick="nav('purchase')">Comprar ahora →</span></div>` :
+    keys.map(k => {
+      const days = daysLeft(k.expiresAt);
+      return `<div class="key-box">
+        <code title="${k.key}">${k.key}</code>
+        ${statusBadge(k.status)}
+        <button class="btn-sm btn-copy" onclick="copy('${k.key}', this)">📋</button>
+      </div>
+      <div class="key-meta-row" style="margin-bottom:12px">
+        <span>Plan: <b>${k.plan || 'falcao'}</b></span>
+        <span>Expira: <b>${fmtDate(k.expiresAt)}</b></span>
+        ${k.expiresAt ? `<span>Días: <b>${days === 0 ? 'Expirada' : days}</b></span>` : '<span><b>Lifetime</b></span>'}
+      </div>
+      ${k.canDownload && k.loaders && k.loaders.length ? k.loaders.map(l => `<a class="dl-btn" href="/api/account/download/${l}" download>⬇ Descargar Loader ${l}</a>`).join('') : ''}`;
+    }).join('<hr class="divider"/>');
+
+  ct.innerHTML = `
+    <div class="dash-header">
+      <div class="dash-banner">
+        <img src="https://i.imgur.com/JuXCB5n.jpg" alt="banner" onerror="this.style.opacity='0'"/>
+        <div class="dash-banner-overlay"></div>
+      </div>
+      <div class="dash-user">
+        <img class="dash-avatar" src="${avatarSrc}" alt="avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
+        <div class="dash-user-info">
+          <h2>${currentUser.discordUsername}</h2>
+          <p style="color:var(--muted);font-size:.78rem">${currentUser.discordId}</p>
+          <div class="dash-status-badge" style="background:${statusColors[statusLabel] || '#888'}22;color:${statusColors[statusLabel] || '#888'};border:1px solid ${statusColors[statusLabel] || '#888'}44">
+            ${statusLabel === 'none' ? '● No license' : '● ' + statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1)}
+          </div>
+        </div>
+        <button onclick="logout()" style="margin-left:auto;background:var(--card2);color:var(--muted);border:1px solid var(--stroke);border-radius:8px;padding:7px 13px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit">Salir</button>
+      </div>
+    </div>
+    <div class="dash-grid">
+      <div class="dash-card" style="grid-column:1/-1">
+        <h3>🔑 Mis Licencias</h3>
+        ${keysHtml}
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:8px">
+      <button class="btn-hero-secondary" style="font-size:.82rem;padding:10px 22px" onclick="nav('purchase')">+ Obtener otra licencia</button>
+    </div>`;
+}
+
+async function logout() {
+  await api('/api/account/auth/logout', { method: 'POST' });
+  window.location.reload();
+}
+
+// ── SETTINGS RENDER ────────────────────────────────────────────────────────
+async function renderSettings() {
+  const ct = document.getElementById('settingsContent');
+  if (!ct) return;
+  if (!currentUser) {
+    ct.innerHTML = `<div class="login-cta">
+      <h2>Inicia sesión para acceder</h2>
+      <p>Necesitas una cuenta para gestionar tu licencia.</p>
+      <a class="btn-discord" href="/api/account/auth/login">Iniciar sesión con Discord</a>
+    </div>`;
+    return;
+  }
+  const avatarSrc = currentUser.discordAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png';
+  ct.innerHTML = `
+    <div class="settings-banner">
+      <div class="settings-banner-img">
+        <img src="https://i.imgur.com/JuXCB5n.jpg" alt="banner" onerror="this.style.opacity='0'"/>
+      </div>
+      <div class="settings-user-row">
+        <img class="s-avatar" src="${avatarSrc}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
+        <div>
+          <span style="font-weight:700">${currentUser.discordUsername}</span>
+          <span class="s-tag" id="licenseStatusTag">· cargando...</span>
+        </div>
+      </div>
+    </div>
+    <div class="settings-grid">
+      <div class="settings-card">
+        <h3>Redeem License</h3>
+        <p>Before you redeem...<br>By redeeming you agree with Falcao External Terms of Service. You confirm that your license has been obtained from a legitimate source.</p>
+        <input class="s-input" id="redeemInput" type="text" placeholder="FALCAO-EXTERNAL-XXXXXX-XXXXXXX" autocomplete="off" spellcheck="false"/>
+        <button class="btn-settings btn-s-accent" onclick="redeemLicense()">REDEEM LICENSE</button>
+        <div class="s-msg" id="redeemMsg"></div>
+      </div>
+      <div class="settings-card">
+        <h3>HWID Reset</h3>
+        <p>HWID reset can be done once per month. You confirm that this is not being used to share your license.</p>
+        <button class="btn-settings btn-s-outline" onclick="resetHwid()">RESET HWID</button>
+        <div class="s-msg" id="hwidMsg"></div>
+      </div>
+    </div>
+    <div class="settings-card">
+      <div class="referral-mini">
+        <h3>Referral Program</h3>
+        <p>Earn <b>10% of every sale</b> made through your personal link.<br>Generate your unique referral code to get started.</p>
+        <button class="btn-settings btn-s-outline" style="max-width:300px;margin:0 auto" onclick="nav('referrals')">GO TO REFERRALS →</button>
+      </div>
+    </div>`;
+  // Load license status
+  try {
+    const kd = await api('/api/account/keys');
+    const keys = kd.keys || [];
+    const tag = document.getElementById('licenseStatusTag');
+    if (tag) {
+      if (!keys.length) { tag.textContent = '· No license'; tag.style.color = 'var(--muted)'; }
+      else {
+        const k = keys[0];
+        const colors = { active: 'var(--green)', expired: 'var(--red)', paused: 'var(--yellow)' };
+        tag.textContent = `· ${k.status.toUpperCase()}`;
+        tag.style.color = colors[k.status] || 'var(--muted)';
+      }
+    }
+  } catch (_) {}
+}
+
+async function redeemLicense() {
+  const key = document.getElementById('redeemInput').value.trim();
+  const msg = document.getElementById('redeemMsg');
+  msg.className = 's-msg'; msg.style.display = 'none';
+  if (!key) { msg.textContent = 'Introduce tu key primero.'; msg.className = 's-msg err'; return; }
+  try {
+    const data = await api('/api/account/claim', { method: 'POST', body: JSON.stringify({ key }) });
+    if (data.ok) {
+      msg.textContent = '✅ Key reclamada correctamente. Puedes verla en el Dashboard.';
+      msg.className = 's-msg ok';
+      document.getElementById('redeemInput').value = '';
+    } else {
+      msg.textContent = '❌ ' + (data.message || 'Error al reclamar.');
+      msg.className = 's-msg err';
+    }
+  } catch (e) { msg.textContent = '❌ Error de red.'; msg.className = 's-msg err'; }
+}
+
+async function resetHwid() {
+  const msg = document.getElementById('hwidMsg');
+  msg.className = 's-msg'; msg.style.display = 'none';
+  if (!confirm('¿Resetear HWID? Solo puedes hacerlo una vez al mes.')) return;
+  try {
+    const kd = await api('/api/account/keys');
+    const key = (kd.keys || [])[0];
+    if (!key) { msg.textContent = '❌ No tienes ninguna key.'; msg.className = 's-msg err'; return; }
+    const data = await api(`/api/manage/keys/${encodeURIComponent(key.key)}/reset-hwid`, { method: 'POST', body: '{}' });
+    if (data.ok || data.message) {
+      msg.textContent = data.ok ? '✅ HWID reseteado correctamente.' : '❌ ' + data.message;
+      msg.className = 's-msg ' + (data.ok ? 'ok' : 'err');
+    } else { msg.textContent = '❌ No autorizado o error.'; msg.className = 's-msg err'; }
+  } catch (e) { msg.textContent = '❌ Error de red.'; msg.className = 's-msg err'; }
+}
+
+// ── REFERRALS RENDER ───────────────────────────────────────────────────────
+async function renderReferrals() {
+  const ct = document.getElementById('referralsContent');
+  if (!ct) return;
+  if (!currentUser) {
+    ct.innerHTML = `<div class="login-cta">
+      <h2>Programa de Referidos</h2>
+      <p>Inicia sesión para acceder a tu programa de referidos y empezar a ganar.</p>
+      <a class="btn-discord" href="/api/account/auth/login">Iniciar sesión con Discord</a>
+    </div>`;
+    return;
+  }
+
+  // Load referral data if API exists, otherwise show static UI
+  let refData = { balance: 0, totalEarned: 0, withdrawn: 0, sales: 0, code: null, payouts: [] };
+  try {
+    const rd = await api(`/api/referrals/status?discordId=${encodeURIComponent(currentUser.discordId)}`);
+    if (rd.ok) refData = { ...refData, ...rd };
+  } catch (_) {}
+
+  refCode = refData.code || null;
+  const refLink = refCode ? `${location.origin}/?ref=${refCode}` : null;
+
+  ct.innerHTML = `
+    <div style="margin-bottom:6px">
+      <div style="font-size:.72rem;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">AFFILIATE</div>
+      <h2 style="font-size:1.6rem;font-weight:900;letter-spacing:-.03em">Referral <span style="color:var(--accent)">Program</span></h2>
+      <p style="color:var(--muted);font-size:.85rem;margin-top:6px;margin-bottom:24px">
+        Share Falcao External with your community and earn <b style="color:var(--text)">10% of every sale</b> made through your link.<br>
+        Cash out in crypto once you reach $25.
+      </p>
+    </div>
+
+    <div class="ref-stats">
+      <div class="ref-stat"><div class="label">Available Balance</div><div class="value">$${Number(refData.balance || 0).toFixed(2)}</div></div>
+      <div class="ref-stat"><div class="label">Total Earned</div><div class="value">$${Number(refData.totalEarned || 0).toFixed(2)}</div></div>
+      <div class="ref-stat"><div class="label">Withdrawn</div><div class="value">$${Number(refData.withdrawn || 0).toFixed(2)}</div></div>
+      <div class="ref-stat"><div class="label">Referred Sales</div><div class="value" style="color:var(--text)">${refData.sales || 0}</div></div>
+    </div>
+
+    <div class="ref-link-card">
+      <h3>Your Referral Link</h3>
+      <p>Generate your unique referral code to start earning. Your code is random, permanent and exclusive to your account.</p>
+      ${refCode ? `
+        <div class="ref-link-box">
+          <code>${refLink}</code>
+          <button class="btn-sm btn-copy" onclick="copy('${refLink}', this)">📋 Copy</button>
+        </div>` : `
+        <button class="btn-settings btn-s-accent" style="max-width:280px;margin-bottom:14px" onclick="generateRefCode()">GENERATE MY REFERRAL CODE</button>
+        <div class="s-msg" id="refCodeMsg"></div>`}
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1. Share</div>
+          <div class="step-title">Comparte</div>
+          <div class="step-desc">Send your link anywhere — Discord, TikTok, YouTube, forums.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2. Earn</div>
+          <div class="step-title">Gana</div>
+          <div class="step-desc">You get 10% of every sale when your referral buys their key.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3. Withdraw</div>
+          <div class="step-title">Retira</div>
+          <div class="step-desc">Cash out in LTC, USDC or USDT (ERC-20) from $25.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ref-two-col">
+      <div class="withdraw-card">
+        <h3>Request a Withdrawal</h3>
+        <p class="sub">Withdrawals unlock at <b>$25</b> and are processed manually within 72 hours. Double-check your address — crypto transactions cannot be reversed.</p>
+        <div class="crypto-tabs">
+          <div class="crypto-tab active" data-crypto="ltc" onclick="selectCrypto(this,'ltc')">LTC<br><span style="font-size:.65rem;color:var(--muted)">Litecoin</span></div>
+          <div class="crypto-tab" data-crypto="usdc" onclick="selectCrypto(this,'usdc')">USDC<br><span style="font-size:.65rem;color:var(--muted)">ERC-20</span></div>
+          <div class="crypto-tab" data-crypto="usdt" onclick="selectCrypto(this,'usdt')">USDT<br><span style="font-size:.65rem;color:var(--muted)">ERC-20</span></div>
+        </div>
+        <input class="s-input" id="withdrawAddr" type="text" placeholder="Your LTC address" style="margin-bottom:8px"/>
+        <input class="s-input" id="withdrawAmt" type="number" value="25" min="25" step="0.01"/>
+        <div class="progress-bar"><div class="progress-fill" id="balanceProgress" style="width:${Math.min(100, (refData.balance / 25) * 100)}%"></div></div>
+        <div class="progress-label"><span>PROGRESS TO PAYOUT</span><span>$${Number(refData.balance || 0).toFixed(2)} / $25</span></div>
+        <button class="btn-settings btn-s-accent" style="margin-top:12px" onclick="requestWithdrawal()">REQUEST WITHDRAWAL</button>
+        <div class="s-msg" id="withdrawMsg"></div>
+      </div>
+      <div class="payout-card">
+        <h3>Payout History</h3>
+        ${refData.payouts && refData.payouts.length ? refData.payouts.map(p => `
+          <div style="background:var(--card2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:.8rem">
+            <div style="display:flex;justify-content:space-between"><span>${p.crypto || 'LTC'}</span><b style="color:var(--green)">$${p.amount}</b></div>
+            <div style="color:var(--muted);font-size:.72rem;margin-top:4px">${fmtDate(p.date)}</div>
+          </div>`).join('') : '<div class="payout-empty">No withdrawals yet. Your payout history will appear here.</div>'}
+      </div>
+    </div>
+
+    <div class="ref-link-card" style="margin-top:16px">
+      <h3 style="color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">RECENT EARNINGS</h3>
+      <div id="recentEarnings">
+        ${refData.recentEarnings && refData.recentEarnings.length ? refData.recentEarnings.map(e => `
+          <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--stroke);font-size:.82rem">
+            <span style="color:var(--muted)">${fmtDate(e.date)}</span>
+            <span style="color:var(--green)">+$${e.amount}</span>
+          </div>`).join('') : '<div class="payout-empty">No recent earnings.</div>'}
+      </div>
+    </div>`;
+}
+
+function selectCrypto(el, crypto) {
+  selectedCrypto = crypto;
+  document.querySelectorAll('.crypto-tab').forEach(t => t.classList.toggle('active', t.dataset.crypto === crypto));
+  const addrInput = document.getElementById('withdrawAddr');
+  if (addrInput) addrInput.placeholder = `Your ${crypto.toUpperCase()} address`;
+}
+
+async function generateRefCode() {
+  const msg = document.getElementById('refCodeMsg');
+  if (msg) { msg.className = 's-msg'; msg.style.display = 'none'; }
+  try {
+    const data = await api('/api/referrals/generate', { method: 'POST', body: JSON.stringify({ discordId: currentUser.discordId }) });
+    if (data.ok && data.code) {
+      refCode = data.code;
+      renderReferrals();
+    } else {
+      if (msg) { msg.textContent = '❌ ' + (data.message || 'Error generando código.'); msg.className = 's-msg err'; }
+    }
+  } catch (_) { if (msg) { msg.textContent = '❌ Error de red.'; msg.className = 's-msg err'; } }
+}
+
+async function requestWithdrawal() {
+  const addr = (document.getElementById('withdrawAddr') || {}).value?.trim();
+  const amt = parseFloat((document.getElementById('withdrawAmt') || {}).value || 0);
+  const msg = document.getElementById('withdrawMsg');
+  msg.className = 's-msg'; msg.style.display = 'none';
+  if (!addr) { msg.textContent = '❌ Introduce tu dirección.'; msg.className = 's-msg err'; return; }
+  if (amt < 25) { msg.textContent = '❌ El mínimo de retiro es $25.'; msg.className = 's-msg err'; return; }
+  try {
+    const data = await api('/api/referrals/withdraw', { method: 'POST', body: JSON.stringify({ discordId: currentUser.discordId, address: addr, amount: amt, crypto: selectedCrypto }) });
+    if (data.ok) { msg.textContent = '✅ Solicitud enviada. Se procesará en 72h.'; msg.className = 's-msg ok'; }
+    else { msg.textContent = '❌ ' + (data.message || 'Error.'); msg.className = 's-msg err'; }
+  } catch (_) { msg.textContent = '❌ Error de red.'; msg.className = 's-msg err'; }
+}
+
+// ── AUTH INIT ──────────────────────────────────────────────────────────────
+async function initAuth() {
+  const navRight = document.getElementById('navRight');
+  try {
+    const status = await api('/api/account/auth/status');
+    if (status.authenticated) {
+      currentUser = status;
+      const avatar = status.discordAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png';
+      navRight.innerHTML = `
+        <a class="nav-avatar" href="#" onclick="nav('dashboard');return false">
+          <img src="${avatar}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
+          ${status.discordUsername}
+        </a>`;
+    } else {
+      currentUser = null;
+      navRight.innerHTML = `
+        <a href="/api/account/auth/login" style="color:var(--muted);font-size:.82rem;font-weight:500;padding:7px 12px;border-radius:8px;border:1px solid var(--stroke);background:rgba(255,255,255,.04);text-decoration:none">Login</a>
+        <button class="btn-dashboard" onclick="nav('purchase')">Purchase Now</button>`;
+    }
+  } catch (_) {
+    navRight.innerHTML = `<button class="btn-dashboard" onclick="nav('purchase')">Purchase Now</button>`;
+  }
+}
+
+// ── STARTUP ────────────────────────────────────────────────────────────────
+(async () => {
+  await initAuth();
+  const tab = new URLSearchParams(location.search).get('tab');
+  if (tab && document.getElementById('page-' + tab)) {
+    nav(tab);
+  } else {
+    nav('home');
+  }
+})();
+</script>
+</body>
+</html>
