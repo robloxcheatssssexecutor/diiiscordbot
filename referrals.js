@@ -63,6 +63,20 @@ function mountReferralsApi(app, deps) {
     res.json({ ok: true, ...user });
   });
 
+  // GET validate ref code (used at checkout)
+  app.get("/api/referrals/validate", (req, res) => {
+    const { code, discordId } = req.query;
+    if (!code) return res.status(400).json({ ok: false, message: "Falta código." });
+    const db = readDb();
+    const owner = Object.values(db.users).find(u => u.code === code.toUpperCase());
+    if (!owner) return res.status(404).json({ ok: false, message: "Código no válido." });
+    // Cannot use your own code
+    if (discordId && owner.discordId === discordId) {
+      return res.status(400).json({ ok: false, message: "No puedes usar tu propio código." });
+    }
+    res.json({ ok: true, code: owner.code, referrerId: owner.discordId });
+  });
+
   // POST generate code
   app.post("/api/referrals/generate", (req, res) => {
     const { discordId } = req.body || {};

@@ -173,16 +173,37 @@ async function notifyAdminLtcConfirmed(order, txid) {
 
 // ── LTC price fetcher ──────────────────────────────────────────────────────
 async function getEurToLtc(eurAmount) {
-  try {
-    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=litecoin&vs_currencies=eur");
-    const d = await r.json();
-    const priceEur = d?.litecoin?.eur;
-    if (!priceEur) throw new Error("no price");
-    const ltcAmount = (eurAmount / priceEur);
-    return ltcAmount.toFixed(6);
-  } catch (_) {
-    return null;
+  // Try multiple price APIs with fallback
+  const apis = [
+    async () => {
+      const r = await fetch("https://api.coinbase.com/v2/prices/LTC-EUR/spot", { headers: { "CB-VERSION": "2023-01-01" } });
+      const d = await r.json();
+      const price = parseFloat(d?.data?.amount);
+      if (!price || !isFinite(price)) throw new Error("no price");
+      return price;
+    },
+    async () => {
+      const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=litecoin&vs_currencies=eur");
+      const d = await r.json();
+      const price = d?.litecoin?.eur;
+      if (!price) throw new Error("no price");
+      return price;
+    },
+    async () => {
+      const r = await fetch("https://min-api.cryptocompare.com/data/price?fsym=LTC&tsyms=EUR");
+      const d = await r.json();
+      const price = d?.EUR;
+      if (!price) throw new Error("no price");
+      return price;
+    }
+  ];
+  for (const fn of apis) {
+    try {
+      const priceEur = await fn();
+      return (eurAmount / priceEur).toFixed(6);
+    } catch (_) { /* try next */ }
   }
+  return null;
 }
 
 // ── LTC blockchain checker ─────────────────────────────────────────────────
@@ -246,6 +267,18 @@ function deliverKey(order, deps) {
       found2.claimedAt = new Date().toISOString();
       writeDb(db);
     }
+  }
+
+  // Credit referrer 15% if a valid refCode was used
+  if (order.referrerId && order.referrerId !== order.discordId) {
+    const commission = Number((order.priceEur * 0.15).toFixed(2));
+    try {
+      fetch(`http://localhost:${process.env.PORT || 3000}/api/referrals/credit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ referrerDiscordId: order.referrerId, amount: commission })
+      }).catch(() => {});
+    } catch (_) {}
   }
 
   return key;
@@ -523,11 +556,22 @@ function mountPaymentsApi(app, deps) {
     const durationDaysMap = { week: 7, monthly: 30, lifetime: 36500 };
     const durationDays = durationDaysMap[durationKey] || 30;
 
+    // Validate referral code if provided
+    const refCode = String(req.body.refCode || "").trim().toUpperCase();
+    let referrerId = null;
+    if (refCode) {
+      try {
+        const refRes = await fetch(`http://localhost:${process.env.PORT || 3000}/api/referrals/validate?code=${encodeURIComponent(refCode)}&discordId=${encodeURIComponent(discordId)}`);
+        const refData = await refRes.json();
+        if (refData.ok) referrerId = refData.referrerId;
+      } catch (_) {}
+    }
+
     const orderId = makeOrderId();
     const order = {
       orderId,
       method,
-      plan: licensePlan,  // the actual license plan (falcao/temp/both)
+      plan: licensePlan,
       durationDays,
       priceEur,
       discordId: String(discordId),
@@ -538,7 +582,9 @@ function mountPaymentsApi(app, deps) {
       keyDelivered: null,
       ltcAmountExpected: null,
       stripeSessionId: null,
-      stripeSessionUrl: null
+      stripeSessionUrl: null,
+      refCode: refCode || null,
+      referrerId: referrerId || null
     };
 
     try {

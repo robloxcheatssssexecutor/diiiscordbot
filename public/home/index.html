@@ -17,11 +17,10 @@
     body{font-family:"Inter",system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh}
 
     /* ── BACKGROUND ── */
-    #heroBg{position:fixed;inset:0;z-index:0;pointer-events:none;
-      background:radial-gradient(ellipse at 60% 30%, #1a0a00 0%, #0a0a0a 70%)}
-    #heroBg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.22;filter:saturate(.7)}
+    #heroBg{position:fixed;inset:0;z-index:0;pointer-events:none;background:#050505}
+    #heroBg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.13;filter:saturate(.5) brightness(.7)}
     #heroBg::after{content:'';position:absolute;inset:0;
-      background:linear-gradient(to bottom,rgba(10,10,10,.15) 0%,rgba(10,10,10,.55) 55%,rgba(10,10,10,1) 100%)}
+      background:linear-gradient(to bottom,rgba(5,5,5,.4) 0%,rgba(5,5,5,.65) 50%,rgba(5,5,5,1) 100%)}
 
     /* ── NAVBAR ── */
     .nav{position:fixed;top:0;left:0;right:0;z-index:200;height:58px;
@@ -29,7 +28,7 @@
       padding:0 32px;background:rgba(10,10,10,.85);
       backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06)}
     .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:800;font-size:.95rem;letter-spacing:-.01em}
-    .nav-logo img{width:42px;height:42px;border-radius:10px}
+    .nav-logo img{width:52px;height:52px;border-radius:0;object-fit:contain}
     .nav-links{display:flex;align-items:center;gap:4px}
     .nav-link{text-decoration:none;color:var(--muted);font-size:.82rem;font-weight:500;
       padding:6px 13px;border-radius:8px;transition:color .15s,background .15s;cursor:pointer;background:none;border:none;font-family:inherit}
@@ -121,10 +120,19 @@
     .price-per{font-size:.78rem;color:var(--muted);margin-left:4px}
     .price-discount{display:inline-block;background:#ef4444;color:#fff;font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:middle}
     .btn-buy{width:100%;padding:13px;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;
-      border:none;font-family:inherit;transition:opacity .13s,transform .12s;margin-bottom:10px}
-    .btn-buy:hover{opacity:.88;transform:translateY(-1px)}
-    .btn-buy-accent{background:var(--accent);color:#fff}
+      border:1px solid rgba(255,255,255,.2);background:transparent;color:var(--text);
+      font-family:inherit;transition:background .15s,border-color .15s,color .15s,transform .12s;margin-bottom:10px}
+    .btn-buy:hover{background:var(--accent);border-color:var(--accent);color:#fff;transform:translateY(-1px)}
+    .btn-buy-accent{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.2)}
     .btn-buy-outline{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.2)}
+    /* ── TICKER ── */
+    .hero-ticker{width:100%;overflow:hidden;padding:14px 0;border-top:1px solid rgba(255,255,255,.07);margin-top:16px;position:relative}
+    .hero-ticker::before,.hero-ticker::after{content:'';position:absolute;top:0;width:120px;height:100%;z-index:2}
+    .hero-ticker::before{left:0;background:linear-gradient(to right,rgba(5,5,5,1),transparent)}
+    .hero-ticker::after{right:0;background:linear-gradient(to left,rgba(5,5,5,1),transparent)}
+    .ticker-track{display:flex;gap:36px;white-space:nowrap;animation:ticker 28s linear infinite}
+    .ticker-track span{font-size:.78rem;font-weight:600;color:var(--muted);letter-spacing:.03em;flex-shrink:0}
+    @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
     .paypal-link{text-align:center;font-size:.75rem;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:5px}
 
     /* ── DASHBOARD ── */
@@ -248,7 +256,7 @@
   </style>
 </head>
 <body>
-<div id="heroBg"><img src="https://i.imgur.com/5WnMlAm.jpg" alt="" onerror="this.style.display='none'"/></div>
+<div id="heroBg"><img src="https://i.imgur.com/zNPRXMj.jpg" alt="" onerror="this.style.display='none'"/></div>
 
 <!-- NAVBAR -->
 <nav class="nav">
@@ -256,9 +264,10 @@
     <img src="https://i.imgur.com/5QMzCva.png" alt="logo"/>
   </a>
   <div class="nav-links">
-    <button class="nav-link" onclick="nav('pricing')">Pricing</button>
+    <button class="nav-link" onclick="nav('purchase')">Purchase</button>
     <button class="nav-link" onclick="nav('features')">Features</button>
     <button class="nav-link" onclick="nav('dashboard')">Dashboard</button>
+    <button class="nav-link" id="manageNavBtn" style="display:none" onclick="window.location.href='/manage'">Manage</button>
   </div>
   <div class="nav-right" id="navRight">
     <button class="btn-dashboard" onclick="nav('dashboard')">Open Dashboard</button>
@@ -270,7 +279,7 @@
 <!-- ══════════════ HOME ══════════════ -->
 <div class="page active" id="page-home">
   <div class="hero">
-    <img src="https://i.imgur.com/5QMzCva.png" alt="logo" style="width:min(90px,22vw);border-radius:20px;box-shadow:0 0 48px rgba(232,88,34,.5);margin-bottom:18px"/>
+    <img src="https://i.imgur.com/5QMzCva.png" alt="logo" style="width:min(130px,30vw);border-radius:0;object-fit:contain;filter:drop-shadow(0 0 32px rgba(232,88,34,.6));margin-bottom:14px"/>
     <div class="hero-badge">🔥 The #1 FiveM External</div>
     <h1>The Number ONE<br><span>FiveM EXTERNAL</span></h1>
     <p>Panel remoto desde tu móvil. ESP, Aimbot, Exploits y más — control total sin límites.</p>
@@ -290,6 +299,13 @@
     <div class="hero-float hf-right1">🔒 Privacy Protector</div>
     <div class="hero-float hf-right2">⭐ Best in the Market</div>
   </div>
+  <!-- Ticker bar -->
+  <div class="hero-ticker">
+    <div class="ticker-track">
+      <span>🔒 Secure</span><span>⚡ Frequent Updates</span><span>📱 Mobile Panel</span><span>🎯 Silent Aim</span><span>👁 ESP</span><span>🚗 Vehicle Exploits</span><span>🛡 Stream-proof</span><span>🔒 Privacy Protector</span><span>⭐ Best in Market</span><span>🔒 Secure</span><span>⚡ Frequent Updates</span><span>📱 Mobile Panel</span><span>🎯 Silent Aim</span><span>👁 ESP</span><span>🚗 Vehicle Exploits</span><span>🛡 Stream-proof</span><span>🔒 Privacy Protector</span><span>⭐ Best in Market</span>
+    </div>
+  </div>
+</div>
 </div>
 
 <!-- ══════════════ FEATURES ══════════════ -->
@@ -347,33 +363,26 @@
   </div>
 </div>
 
-<!-- ══════════════ PRICING ══════════════ -->
-<div class="page" id="page-pricing">
-  <div class="section">
-    <div class="container">
-      <div class="section-label">PLANES</div>
-      <h2 class="section-title">Elige tu <span>plan</span></h2>
-      <p class="section-sub">Sin suscripciones obligatorias. Paga lo que necesitas.</p>
-      <div class="pricing-grid" id="pricingGrid">
-        <div class="price-card" style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Cargando precios...</div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ══════════════ PURCHASE ══════════════ -->
 <div class="page" id="page-purchase">
   <div class="section">
     <div class="container">
       <div class="section-label">COMPRAR</div>
       <h2 class="section-title">Obtén tu <span>licencia</span></h2>
-      <p class="section-sub">Pago seguro. Key entregada automáticamente.</p>
+      <p class="section-sub">Inicia sesión con Discord para comprar. Key entregada automáticamente.</p>
+      <div id="purchaseLoginWarn" style="display:none;background:rgba(232,88,34,.08);border:1px solid rgba(232,88,34,.25);border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:.85rem;display:flex;align-items:center;gap:10px">
+        <span>⚠️</span>
+        <span>Debes <a href="/api/account/auth/login" style="color:var(--accent);font-weight:700">iniciar sesión</a> para completar la compra.</span>
+      </div>
       <div class="pricing-grid" id="purchaseGrid">
         <div class="price-card" style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Cargando precios...</div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- page-pricing alias so old links still work -->
+<div class="page" id="page-pricing" style="display:none"></div>
 
 <!-- ══════════════ DASHBOARD ══════════════ -->
 <div class="page" id="page-dashboard">
@@ -384,12 +393,10 @@
         <button class="dash-tab active" data-dtab="profile" onclick="dashTab('profile')">Profile</button>
         <button class="dash-tab" data-dtab="settings" onclick="dashTab('settings')">Settings</button>
         <button class="dash-tab" data-dtab="referrals" onclick="dashTab('referrals')">Referrals</button>
-        <button class="dash-tab" data-dtab="purchase" onclick="dashTab('purchase')">Purchase</button>
       </div>
       <div id="dtab-profile" class="dtab-panel active"><div id="dashContent"></div></div>
       <div id="dtab-settings" class="dtab-panel"><div id="settingsContent"></div></div>
       <div id="dtab-referrals" class="dtab-panel"><div id="referralsContent"></div></div>
-      <div id="dtab-purchase" class="dtab-panel"><div id="purchaseGridDash"></div></div>
     </div>
   </div>
 </div>
@@ -427,7 +434,6 @@ function dashTab(tabId) {
   if (tabId === 'profile') renderDashboard();
   if (tabId === 'settings') renderSettings();
   if (tabId === 'referrals') renderReferrals();
-  if (tabId === 'purchase') renderPurchaseDash();
 }
 
 // ── API helper ─────────────────────────────────────────────────────────────
@@ -531,27 +537,52 @@ function switchDurTab(cardId, planKey) {
 }
 
 async function renderPricing(pageId) {
-  const gridId = pageId === 'purchase' ? 'purchaseGrid' : 'pricingGrid';
-  const grid = document.getElementById(gridId);
+  const grid = document.getElementById('purchaseGrid');
   if (!grid) return;
+  const warn = document.getElementById('purchaseLoginWarn');
+  if (warn) warn.style.display = !currentUser ? 'flex' : 'none';
   if (grid.dataset.loaded) return;
   grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Cargando...</div>';
   try {
     const data = await loadPrices();
     const products = data.products || {};
-    const isPurchase = pageId === 'purchase';
-    const cards = Object.entries(products).map(([id, p]) => buildPriceCard(id, p, data, isPurchase)).join('');
+    const cards = Object.entries(products).map(([id, p]) => buildPriceCard(id, p, data, true)).join('');
     grid.innerHTML = cards || '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">No hay productos disponibles.</div>';
     grid.dataset.loaded = '1';
   } catch (e) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Error cargando precios.</div>';
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--red)">Error cargando precios.</div>';
+  }
+}
+
+async function validateRefCode() {
+  const input = document.getElementById('refCodeInput');
+  const status = document.getElementById('refCodeStatus');
+  if (!input || !status) return;
+  const code = input.value.trim().toUpperCase();
+  if (!code) { status.textContent = ''; return; }
+  status.style.color = '#888'; status.textContent = 'Validando...';
+  try {
+    const discordId = currentUser ? currentUser.discordId : '';
+    const data = await api(`/api/referrals/validate?code=${encodeURIComponent(code)}&discordId=${encodeURIComponent(discordId)}`);
+    if (data.ok) {
+      status.style.color = '#22c55e';
+      status.textContent = '✅ Código válido — 15% de tu compra irá al referidor.';
+    } else {
+      status.style.color = '#ef4444';
+      status.textContent = '❌ ' + (data.message || 'Código no válido.');
+    }
+  } catch (_) {
+    status.style.color = '#ef4444';
+    status.textContent = '❌ Error al validar.';
   }
 }
 
 async function startPurchase(productId, cardId) {
   if (!currentUser) {
+    // Save intended purchase so we can resume after login
+    sessionStorage.setItem('pendingPurchase', JSON.stringify({ productId, cardId }));
     if (confirm('Necesitas iniciar sesión con Discord para comprar. ¿Ir al login?')) {
-      window.location.href = '/api/account/auth/login?redirect=/?tab=purchase';
+      window.location.href = '/api/account/auth/login';
     }
     return;
   }
@@ -563,8 +594,9 @@ async function startPurchase(productId, cardId) {
   if (!product) return;
   const price = product[durationKey];
 
-  const method = await showPaymentModal(productId, durationKey, price, product.name);
-  if (!method) return;
+  const result = await showPaymentModal(productId, durationKey, price, product.name);
+  if (!result) return;
+  const { method, refCode: usedRefCode } = typeof result === 'object' ? result : { method: result, refCode: null };
 
   try {
     const order = await api('/api/payments/create', {
@@ -574,7 +606,8 @@ async function startPurchase(productId, cardId) {
         plan: productId,
         durationKey,
         discordId: currentUser.discordId,
-        discordUsername: currentUser.discordUsername
+        discordUsername: currentUser.discordUsername,
+        refCode: usedRefCode || undefined
       })
     });
     if (!order.ok) { alert(order.message || 'Error creando orden.'); return; }
@@ -625,10 +658,23 @@ function showPaymentModal(productId, durationKey, price, productName) {
           </button>
         </div>
         <p style="text-align:center;color:#555;font-size:.72rem;margin-top:14px">Pago seguro. Key entregada automáticamente tras confirmar.</p>
+        <div style="margin-top:12px;border-top:1px solid #1a1a1a;padding-top:12px">
+          <div style="font-size:.72rem;color:#555;margin-bottom:6px">¿Tienes un código de referido? (opcional)</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="refCodeInput" type="text" placeholder="REF-XXXXXXXX" maxlength="16"
+              style="flex:1;background:#181818;border:1px solid #2a2a2a;color:#fff;font-family:inherit;font-size:.82rem;padding:9px 12px;border-radius:8px;outline:none;text-transform:uppercase"/>
+            <button onclick="validateRefCode()" style="background:#1a1a1a;border:1px solid #2a2a2a;color:#888;border-radius:8px;padding:9px 12px;font-size:.75rem;cursor:pointer;font-family:inherit;white-space:nowrap">Validar</button>
+          </div>
+          <div id="refCodeStatus" style="font-size:.72rem;margin-top:5px;min-height:16px"></div>
+        </div>
       </div>`;
     document.body.appendChild(bg);
     bg.querySelectorAll('.pay-method-btn').forEach(btn => {
-      btn.onclick = () => { bg.remove(); resolve(btn.dataset.method); };
+      btn.onclick = () => {
+        const refCodeVal = (document.getElementById('refCodeInput') || {}).value?.trim().toUpperCase() || null;
+        bg.remove();
+        resolve({ method: btn.dataset.method, refCode: refCodeVal });
+      };
     });
     bg.onclick = e => { if (e.target === bg) { bg.remove(); resolve(null); } };
   });
@@ -953,6 +999,12 @@ async function initAuth() {
           <img src="${avatar}" alt="av" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"/>
           ${status.discordUsername}
         </a>`;
+      // Check admin
+      try {
+        const ar = await api(`/api/manage/is-admin?discordId=${encodeURIComponent(status.discordId)}`);
+        const manageBtn = document.getElementById('manageNavBtn');
+        if (ar.isAdmin === true && manageBtn) manageBtn.style.display = 'flex';
+      } catch (_) {}
     } else {
       currentUser = null;
       navRight.innerHTML = `
