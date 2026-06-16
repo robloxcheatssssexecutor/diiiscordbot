@@ -29,7 +29,7 @@
       padding:0 32px;background:rgba(10,10,10,.85);
       backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06)}
     .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-weight:800;font-size:.95rem;letter-spacing:-.01em}
-    .nav-logo img{width:28px;height:28px;border-radius:6px}
+    .nav-logo img{width:42px;height:42px;border-radius:10px}
     .nav-links{display:flex;align-items:center;gap:4px}
     .nav-link{text-decoration:none;color:var(--muted);font-size:.82rem;font-weight:500;
       padding:6px 13px;border-radius:8px;transition:color .15s,background .15s;cursor:pointer;background:none;border:none;font-family:inherit}
@@ -101,7 +101,7 @@
     /* ── PRICING ── */
     .pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
     .price-card{background:var(--card);border:1px solid var(--stroke);border-radius:18px;padding:24px;position:relative;transition:border-color .15s}
-    .price-card.featured{border-color:var(--accent)}
+    .price-card:hover{border-color:rgba(232,88,34,.35)}
     .price-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
     .price-card-logo{width:44px;height:44px;border-radius:10px;overflow:hidden;background:#1a1a1a;display:flex;align-items:center;justify-content:center}
     .price-card-logo img{width:100%;height:100%;object-fit:contain}
@@ -237,24 +237,28 @@
     footer{text-align:center;padding:32px 20px;color:var(--muted);font-size:.75rem;border-top:1px solid var(--stroke)}
     footer a{color:var(--accent);text-decoration:none}
     @media(max-width:560px){.nav-links{gap:0}.nav-link{padding:6px 9px;font-size:.75rem}}
+    /* ── DASH TABS ── */
+    .dash-tab{background:none;border:none;border-bottom:2px solid transparent;padding:10px 18px;
+      font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;
+      transition:color .13s,border-color .13s;margin-bottom:-1px}
+    .dash-tab:hover{color:var(--text)}
+    .dash-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .dtab-panel{display:none}
+    .dtab-panel.active{display:block}
   </style>
 </head>
 <body>
-<div id="heroBg"><img src="https://i.imgur.com/JuXCB5n.jpg" alt="" onerror="this.style.display='none'"/></div>
+<div id="heroBg"><img src="https://i.imgur.com/5WnMlAm.jpg" alt="" onerror="this.style.display='none'"/></div>
 
 <!-- NAVBAR -->
 <nav class="nav">
   <a class="nav-logo" href="#" onclick="nav('home');return false">
     <img src="https://i.imgur.com/5QMzCva.png" alt="logo"/>
-    Falcao External
   </a>
   <div class="nav-links">
     <button class="nav-link" onclick="nav('pricing')">Pricing</button>
     <button class="nav-link" onclick="nav('features')">Features</button>
     <button class="nav-link" onclick="nav('dashboard')">Dashboard</button>
-    <button class="nav-link" onclick="nav('settings')">Settings</button>
-    <button class="nav-link" onclick="nav('referrals')">Referrals</button>
-    <button class="nav-link" onclick="nav('purchase')">Purchase</button>
   </div>
   <div class="nav-right" id="navRight">
     <button class="btn-dashboard" onclick="nav('dashboard')">Open Dashboard</button>
@@ -374,44 +378,26 @@
 <!-- ══════════════ DASHBOARD ══════════════ -->
 <div class="page" id="page-dashboard">
   <div class="section">
-    <div class="container" id="dashContent">
-      <div class="login-cta">
-        <h2>Accede al Dashboard</h2>
-        <p>Inicia sesión con Discord para ver tus keys y gestionar tu licencia.</p>
-        <a class="btn-discord" href="/api/account/auth/login">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-          Continuar con Discord
-        </a>
+    <div class="container">
+      <!-- Dashboard inner tabs -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--stroke);margin-bottom:28px">
+        <button class="dash-tab active" data-dtab="profile" onclick="dashTab('profile')">Profile</button>
+        <button class="dash-tab" data-dtab="settings" onclick="dashTab('settings')">Settings</button>
+        <button class="dash-tab" data-dtab="referrals" onclick="dashTab('referrals')">Referrals</button>
+        <button class="dash-tab" data-dtab="purchase" onclick="dashTab('purchase')">Purchase</button>
       </div>
+      <div id="dtab-profile" class="dtab-panel active"><div id="dashContent"></div></div>
+      <div id="dtab-settings" class="dtab-panel"><div id="settingsContent"></div></div>
+      <div id="dtab-referrals" class="dtab-panel"><div id="referralsContent"></div></div>
+      <div id="dtab-purchase" class="dtab-panel"><div id="purchaseGridDash"></div></div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════ SETTINGS ══════════════ -->
-<div class="page" id="page-settings">
-  <div class="section">
-    <div class="container" id="settingsContent">
-      <div class="login-cta">
-        <h2>Inicia sesión para acceder</h2>
-        <p>Necesitas una cuenta para gestionar tu licencia.</p>
-        <a class="btn-discord" href="/api/account/auth/login">Iniciar sesión con Discord</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════ REFERRALS ══════════════ -->
-<div class="page" id="page-referrals">
-  <div class="section">
-    <div class="container" id="referralsContent">
-      <div class="login-cta">
-        <h2>Programa de Referidos</h2>
-        <p>Inicia sesión para acceder a tu programa de referidos.</p>
-        <a class="btn-discord" href="/api/account/auth/login">Iniciar sesión con Discord</a>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- ══════════════ SETTINGS (standalone, kept for compat) ══════════════ -->
+<div class="page" id="page-settings" style="display:none"></div>
+<!-- ══════════════ REFERRALS (standalone, kept for compat) ══════════════ -->
+<div class="page" id="page-referrals" style="display:none"></div>
 
 </div><!-- .page-wrap -->
 
@@ -430,9 +416,18 @@ function nav(id) {
   if (pg) pg.classList.add('active');
   history.replaceState(null, '', id === 'home' ? '/' : '/?tab=' + id);
   if (id === 'pricing' || id === 'purchase') renderPricing(id);
-  if (id === 'dashboard') renderDashboard();
-  if (id === 'settings') renderSettings();
-  if (id === 'referrals') renderReferrals();
+  if (id === 'dashboard') { dashTab('profile'); }
+  if (id === 'settings') { nav('dashboard'); dashTab('settings'); return; }
+  if (id === 'referrals') { nav('dashboard'); dashTab('referrals'); return; }
+}
+
+function dashTab(tabId) {
+  document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === tabId));
+  document.querySelectorAll('.dtab-panel').forEach(p => p.classList.toggle('active', p.id === 'dtab-' + tabId));
+  if (tabId === 'profile') renderDashboard();
+  if (tabId === 'settings') renderSettings();
+  if (tabId === 'referrals') renderReferrals();
+  if (tabId === 'purchase') renderPurchaseDash();
 }
 
 // ── API helper ─────────────────────────────────────────────────────────────
@@ -586,7 +581,7 @@ async function startPurchase(productId, cardId) {
     if (method === 'stripe' && order.stripeUrl) {
       window.location.href = order.stripeUrl;
     } else {
-      window.location.href = '/api/payments/order/' + order.orderId;
+      window.location.href = '/order/' + order.orderId;
     }
   } catch (e) {
     alert('Error de red. Inténtalo de nuevo.');
@@ -597,27 +592,39 @@ function showPaymentModal(productId, durationKey, price, productName) {
   return new Promise(resolve => {
     const existing = document.getElementById('payModalBg');
     if (existing) existing.remove();
-
     const bg = document.createElement('div');
     bg.id = 'payModalBg';
-    bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px';
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px';
     const durationLabels = { week: 'Semana', monthly: 'Mensual', lifetime: 'Lifetime' };
+    const priceStr = typeof price === 'number' ? price.toFixed(2) : '?';
     bg.innerHTML = `
-      <div style="background:#111;border:1px solid #222;border-radius:18px;padding:28px;width:100%;max-width:400px">
-        <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px">Método de pago</h3>
-        <p style="font-size:.8rem;color:#888;margin-bottom:20px">${productName} · ${durationLabels[durationKey] || durationKey} · <b style="color:#fff">€${typeof price === 'number' ? price.toFixed(2) : '?'}</b></p>
+      <div style="background:#111;border:1px solid #2a2a2a;border-radius:18px;padding:28px;width:100%;max-width:420px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="font-size:1rem;font-weight:700">Método de pago</h3>
+          <button onclick="document.getElementById('payModalBg').remove()" style="background:rgba(255,255,255,.07);border:none;color:#888;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:1rem">✕</button>
+        </div>
+        <div style="background:#181818;border-radius:10px;padding:12px 14px;margin-bottom:20px;font-size:.85rem">
+          <span style="color:#888">${productName} · ${durationLabels[durationKey] || durationKey}</span>
+          <span style="float:right;font-weight:800;font-size:1rem;color:#fff">€${priceStr}</span>
+        </div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <button class="pay-method-btn" data-method="stripe" style="background:#635bff;color:#fff;border:none;border-radius:10px;padding:13px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px">
-            🏦 Pagar con Stripe (Tarjeta)
+          <button class="pay-method-btn" data-method="stripe"
+            style="background:#635bff;color:#fff;border:none;border-radius:11px;padding:14px 16px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px;text-align:left">
+            <span style="font-size:1.2rem">🏦</span>
+            <div><div>Pagar con Tarjeta</div><div style="font-size:.72rem;opacity:.7;font-weight:400">Stripe · Visa, Mastercard</div></div>
           </button>
-          <button class="pay-method-btn" data-method="ltc" style="background:#222;color:#fff;border:1px solid #333;border-radius:10px;padding:13px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px">
-            🪙 Pagar con Litecoin
+          <button class="pay-method-btn" data-method="ltc"
+            style="background:#1a1a1a;color:#fff;border:1px solid #2a2a2a;border-radius:11px;padding:14px 16px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px;text-align:left">
+            <span style="font-size:1.2rem">🪙</span>
+            <div><div>Pagar con Litecoin</div><div style="font-size:.72rem;opacity:.7;font-weight:400">Confirmación automática · ~€${priceStr}</div></div>
           </button>
-          <button class="pay-method-btn" data-method="paypal" style="background:#003087;color:#fff;border:none;border-radius:10px;padding:13px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px">
-            💳 Pagar con PayPal F&amp;F
+          <button class="pay-method-btn" data-method="paypal"
+            style="background:#003087;color:#fff;border:none;border-radius:11px;padding:14px 16px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px;text-align:left">
+            <span style="font-size:1.2rem">💳</span>
+            <div><div>Pagar con PayPal F&amp;F</div><div style="font-size:.72rem;opacity:.7;font-weight:400">Amigos y familiares · Manual</div></div>
           </button>
         </div>
-        <button onclick="document.getElementById('payModalBg').remove()" style="width:100%;margin-top:12px;background:transparent;color:#666;border:none;font-size:.8rem;cursor:pointer;padding:8px;font-family:inherit">Cancelar</button>
+        <p style="text-align:center;color:#555;font-size:.72rem;margin-top:14px">Pago seguro. Key entregada automáticamente tras confirmar.</p>
       </div>`;
     document.body.appendChild(bg);
     bg.querySelectorAll('.pay-method-btn').forEach(btn => {
@@ -628,6 +635,21 @@ function showPaymentModal(productId, durationKey, price, productName) {
 }
 
 // ── DASHBOARD RENDER ───────────────────────────────────────────────────────
+async function renderPurchaseDash() {
+  const grid = document.getElementById('purchaseGridDash');
+  if (!grid || grid.dataset.loaded) return;
+  grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Cargando...</div>';
+  try {
+    const data = await loadPrices();
+    const products = data.products || {};
+    const cards = Object.entries(products).map(([id, p]) => buildPriceCard(id, p, data, true)).join('');
+    grid.innerHTML = `<div class="pricing-grid">${cards || '<p style="color:var(--muted);text-align:center">No hay productos.</p>'}</div>`;
+    grid.dataset.loaded = '1';
+  } catch (e) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">Error cargando precios.</div>';
+  }
+}
+
 async function renderDashboard() {
   const ct = document.getElementById('dashContent');
   if (!ct) return;
@@ -870,48 +892,38 @@ async function renderReferrals() {
     </div>
 
     <div class="ref-two-col">
-      <div class="withdraw-card">
-        <h3>Request a Withdrawal</h3>
-        <p class="sub">Withdrawals unlock at <b>$25</b> and are processed manually within 72 hours. Double-check your address — crypto transactions cannot be reversed.</p>
-        <div class="crypto-tabs">
-          <div class="crypto-tab active" data-crypto="ltc" onclick="selectCrypto(this,'ltc')">LTC<br><span style="font-size:.65rem;color:var(--muted)">Litecoin</span></div>
-          <div class="crypto-tab" data-crypto="usdc" onclick="selectCrypto(this,'usdc')">USDC<br><span style="font-size:.65rem;color:var(--muted)">ERC-20</span></div>
-          <div class="crypto-tab" data-crypto="usdt" onclick="selectCrypto(this,'usdt')">USDT<br><span style="font-size:.65rem;color:var(--muted)">ERC-20</span></div>
+      <div class="ref-link-card">
+        <h3>Canjear saldo en keys</h3>
+        <p style="font-size:.8rem;color:var(--muted);margin-bottom:16px">
+          Usa tu saldo acumulado para descuentos en tus próximas keys. Contacta a un admin en Discord con tu código para aplicarlo.
+        </p>
+        <div style="background:var(--card2);border-radius:10px;padding:14px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="color:var(--muted);font-size:.82rem">Saldo disponible</span>
+            <span style="font-size:1.2rem;font-weight:800;color:var(--green)">$${Number(refData.balance || 0).toFixed(2)}</span>
+          </div>
+          <div class="progress-bar" style="margin-top:8px">
+            <div class="progress-fill" style="width:${Math.min(100, Number(refData.balance || 0) * 10)}%"></div>
+          </div>
         </div>
-        <input class="s-input" id="withdrawAddr" type="text" placeholder="Your LTC address" style="margin-bottom:8px"/>
-        <input class="s-input" id="withdrawAmt" type="number" value="25" min="25" step="0.01"/>
-        <div class="progress-bar"><div class="progress-fill" id="balanceProgress" style="width:${Math.min(100, (refData.balance / 25) * 100)}%"></div></div>
-        <div class="progress-label"><span>PROGRESS TO PAYOUT</span><span>$${Number(refData.balance || 0).toFixed(2)} / $25</span></div>
-        <button class="btn-settings btn-s-accent" style="margin-top:12px" onclick="requestWithdrawal()">REQUEST WITHDRAWAL</button>
-        <div class="s-msg" id="withdrawMsg"></div>
+        ${refCode ? `
+          <div style="background:var(--card2);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+            <code style="flex:1;font-size:.85rem;color:var(--accent)">${refCode}</code>
+            <button class="btn-sm btn-copy" onclick="copy('${refCode}',this)">📋 Copiar</button>
+          </div>
+          <p style="font-size:.72rem;color:var(--muted)">Muéstrale este código a un admin en Discord para que aplique el descuento a tu pedido.</p>
+        ` : `<button class="btn-settings btn-s-outline" onclick="generateRefCode()">GENERAR MI CÓDIGO</button>`}
+        <div class="s-msg" id="redeemRefMsg"></div>
       </div>
       <div class="payout-card">
-        <h3>Payout History</h3>
-        ${refData.payouts && refData.payouts.length ? refData.payouts.map(p => `
-          <div style="background:var(--card2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:.8rem">
-            <div style="display:flex;justify-content:space-between"><span>${p.crypto || 'LTC'}</span><b style="color:var(--green)">$${p.amount}</b></div>
-            <div style="color:var(--muted);font-size:.72rem;margin-top:4px">${fmtDate(p.date)}</div>
-          </div>`).join('') : '<div class="payout-empty">No withdrawals yet. Your payout history will appear here.</div>'}
-      </div>
-    </div>
-
-    <div class="ref-link-card" style="margin-top:16px">
-      <h3 style="color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">RECENT EARNINGS</h3>
-      <div id="recentEarnings">
+        <h3>Historial de ganancias</h3>
         ${refData.recentEarnings && refData.recentEarnings.length ? refData.recentEarnings.map(e => `
           <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--stroke);font-size:.82rem">
             <span style="color:var(--muted)">${fmtDate(e.date)}</span>
             <span style="color:var(--green)">+$${e.amount}</span>
-          </div>`).join('') : '<div class="payout-empty">No recent earnings.</div>'}
+          </div>`).join('') : '<div class="payout-empty">No hay ganancias aún. Comparte tu link y empieza a ganar.</div>'}
       </div>
     </div>`;
-}
-
-function selectCrypto(el, crypto) {
-  selectedCrypto = crypto;
-  document.querySelectorAll('.crypto-tab').forEach(t => t.classList.toggle('active', t.dataset.crypto === crypto));
-  const addrInput = document.getElementById('withdrawAddr');
-  if (addrInput) addrInput.placeholder = `Your ${crypto.toUpperCase()} address`;
 }
 
 async function generateRefCode() {
@@ -926,20 +938,6 @@ async function generateRefCode() {
       if (msg) { msg.textContent = '❌ ' + (data.message || 'Error generando código.'); msg.className = 's-msg err'; }
     }
   } catch (_) { if (msg) { msg.textContent = '❌ Error de red.'; msg.className = 's-msg err'; } }
-}
-
-async function requestWithdrawal() {
-  const addr = (document.getElementById('withdrawAddr') || {}).value?.trim();
-  const amt = parseFloat((document.getElementById('withdrawAmt') || {}).value || 0);
-  const msg = document.getElementById('withdrawMsg');
-  msg.className = 's-msg'; msg.style.display = 'none';
-  if (!addr) { msg.textContent = '❌ Introduce tu dirección.'; msg.className = 's-msg err'; return; }
-  if (amt < 25) { msg.textContent = '❌ El mínimo de retiro es $25.'; msg.className = 's-msg err'; return; }
-  try {
-    const data = await api('/api/referrals/withdraw', { method: 'POST', body: JSON.stringify({ discordId: currentUser.discordId, address: addr, amount: amt, crypto: selectedCrypto }) });
-    if (data.ok) { msg.textContent = '✅ Solicitud enviada. Se procesará en 72h.'; msg.className = 's-msg ok'; }
-    else { msg.textContent = '❌ ' + (data.message || 'Error.'); msg.className = 's-msg err'; }
-  } catch (_) { msg.textContent = '❌ Error de red.'; msg.className = 's-msg err'; }
 }
 
 // ── AUTH INIT ──────────────────────────────────────────────────────────────
