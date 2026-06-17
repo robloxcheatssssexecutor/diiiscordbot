@@ -76,6 +76,8 @@ RULES:
 // ── Conversation storage ────────────────────────────────────────────────────
 let _dataDir = null;
 let _convsPath = null;
+let _discordClient = null;
+let _backupChannelId = null;
 
 /** @type {Map<string, Array<{role:'user'|'model', parts:[{text:string}], ts:number}>>} */
 const conversations = new Map();
@@ -112,7 +114,25 @@ function saveConversation(sessionId, userMsg, agentMsg, meta = {}) {
     }
     // Keep max 500 conversations
     if (convs.length > 500) convs.splice(0, convs.length - 500);
-    fs.writeFileSync(_convsPath, JSON.stringify({ conversations: convs }, null, 2), "utf8");
+    const updated = { conversations: convs };
+    fs.writeFileSync(_convsPath, JSON.stringify(updated, null, 2), "utf8");
+    // Backup web conversations to Discord backup channel periodically (every 10 web turns)
+    if (meta.source === "web" && _discordClient && _discordClient.isReady() && _backupChannelId) {
+      const webConvs = convs.filter(c => c.source === "web");
+      const totalTurns = webConvs.reduce((a, c) => a + c.turns.length, 0);
+      if (totalTurns % 10 === 0) {
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const payload = { exportedAt: new Date().toISOString(), conversations: webConvs };
+        const { AttachmentBuilder } = require("discord.js");
+        const attachment = new AttachmentBuilder(
+          Buffer.from(JSON.stringify(payload, null, 2), "utf8"),
+          { name: `ai-conversations-web-${stamp}.json` }
+        );
+        _discordClient.channels.fetch(_backupChannelId).then(ch => {
+          if (ch && ch.isTextBased()) ch.send({ content: "🤖 AI web conversations backup", files: [attachment] }).catch(() => {});
+        }).catch(() => {});
+      }
+    }
   } catch (_) {}
 }
 

@@ -15,6 +15,7 @@
     *{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
     body{font-family:"Inter",system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh}
+    body.home-page{overflow:hidden;height:100vh}
 
     /* ── BACKGROUND ── */
     #heroBg{position:fixed;inset:0;z-index:0;pointer-events:none;
@@ -50,8 +51,11 @@
     .page.active{display:block}
 
     /* ── HERO ── */
-    .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-      text-align:center;padding:80px 20px 60px;position:relative}
+    .hero{height:calc(100vh - 72px);display:flex;flex-direction:column;align-items:center;justify-content:center;
+      text-align:center;padding:40px 20px 0;position:relative;overflow:hidden}
+    /* Ticker pinned to bottom of hero */
+    .hero-ticker{position:absolute;bottom:0;left:0;right:0;overflow:hidden;padding:12px 0;
+      border-top:1px solid rgba(255,255,255,.07);background:rgba(6,4,10,.6);backdrop-filter:blur(4px)}
     .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(232,88,34,.12);
       border:1px solid rgba(232,88,34,.3);color:var(--accent);font-size:.75rem;font-weight:600;
       padding:5px 13px;border-radius:999px;margin-bottom:22px;letter-spacing:.03em}
@@ -127,10 +131,6 @@
     .btn-buy-accent{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.2)}
     .btn-buy-outline{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.2)}
     /* ── TICKER ── */
-    .hero-ticker{width:100%;overflow:hidden;padding:14px 0;border-top:1px solid rgba(255,255,255,.07);margin-top:16px;position:relative}
-    .hero-ticker::before,.hero-ticker::after{content:'';position:absolute;top:0;width:120px;height:100%;z-index:2}
-    .hero-ticker::before{left:0;background:linear-gradient(to right,rgba(5,5,5,1),transparent)}
-    .hero-ticker::after{right:0;background:linear-gradient(to left,rgba(5,5,5,1),transparent)}
     .ticker-track{display:flex;gap:36px;white-space:nowrap;animation:ticker 28s linear infinite}
     .ticker-track span{font-size:.78rem;font-weight:600;color:var(--muted);letter-spacing:.03em;flex-shrink:0}
     @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
@@ -305,8 +305,10 @@
   </div>
   <!-- Ticker bar -->
   <div class="hero-ticker">
+    <div style="position:absolute;top:0;left:0;width:80px;height:100%;background:linear-gradient(to right,rgba(6,4,10,.9),transparent);z-index:2;pointer-events:none"></div>
+    <div style="position:absolute;top:0;right:0;width:80px;height:100%;background:linear-gradient(to left,rgba(6,4,10,.9),transparent);z-index:2;pointer-events:none"></div>
     <div class="ticker-track">
-      <span>🔒 Secure</span><span>⚡ Frequent Updates</span><span>📱 Mobile Panel</span><span>🎯 Silent Aim</span><span>👁 ESP</span><span>🚗 Vehicle Exploits</span><span>🛡 Stream-proof</span><span>🔒 Privacy Protector</span><span>⭐ Best in Market</span><span>🔒 Secure</span><span>⚡ Frequent Updates</span><span>📱 Mobile Panel</span><span>🎯 Silent Aim</span><span>👁 ESP</span><span>🚗 Vehicle Exploits</span><span>🛡 Stream-proof</span><span>🔒 Privacy Protector</span><span>⭐ Best in Market</span>
+      <span>🔒 Secure</span><span>⚡ Frequent Updates</span><span>📱 Mobile Panel</span><span>🎯 Silent Aim</span><span>👁 ESP</span><span>🚗 Vehicle Exploits</span><span>🛡 Stream-proof</span><span>🔒 Privacy Protector</span><span>⭐ Best in Market</span><span>🎯 Aimbot</span><span>🚀 Noclip</span><span>💥 Godmode</span><span>🔒 Secure</span><span>⚡ Frequent Updates</span><span>📱 Mobile Panel</span><span>🎯 Silent Aim</span><span>👁 ESP</span><span>🚗 Vehicle Exploits</span><span>🛡 Stream-proof</span><span>🔒 Privacy Protector</span><span>⭐ Best in Market</span><span>🎯 Aimbot</span><span>🚀 Noclip</span><span>💥 Godmode</span>
     </div>
   </div>
 </div>
@@ -409,7 +411,7 @@
         <button class="dash-tab active" data-dtab="profile" onclick="dashTab('profile')">Profile</button>
         <button class="dash-tab" data-dtab="settings" onclick="dashTab('settings')">Settings</button>
         <button class="dash-tab" data-dtab="referrals" onclick="dashTab('referrals')">Referrals</button>
-        <button class="dash-tab" data-dtab="ai" onclick="dashTab('ai')">🤖 AI Agent</button>
+        <button class="dash-tab" data-dtab="ai" onclick="dashTab('ai')">AI Agent</button>
       </div>
       <div id="dtab-profile" class="dtab-panel active"><div id="dashContent"></div></div>
       <div id="dtab-settings" class="dtab-panel"><div id="settingsContent"></div></div>
@@ -437,10 +439,11 @@ let selectedCrypto = 'ltc';
 function nav(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.textContent.trim().toLowerCase() === id));
-  // pricing is alias → show purchase page
   const pageId = (id === 'pricing') ? 'purchase' : id;
   const pg = document.getElementById('page-' + pageId);
   if (pg) pg.classList.add('active');
+  // Lock scroll only on home page
+  document.body.classList.toggle('home-page', id === 'home');
   history.replaceState(null, '', id === 'home' ? '/' : '/?tab=' + id);
   if (id === 'pricing' || id === 'purchase') renderPricing(id);
   if (id === 'dashboard') { dashTab('profile'); }
@@ -1310,38 +1313,112 @@ function setPref(key, value, btn) {
 }
 
 // ── AI CHAT ────────────────────────────────────────────────────────────────
-let aiSessionId = null;
+let aiChats = JSON.parse(localStorage.getItem('fe_ai_chats') || '[]');
+// [{id, name, messages:[{role,text,ts}]}]
+let aiCurrentId = null;
+
+function aiSaveChats() {
+  // Keep max 20 chats, max 30 messages each
+  const trimmed = aiChats.map(c => ({ ...c, messages: c.messages.slice(-30) })).slice(-20);
+  localStorage.setItem('fe_ai_chats', JSON.stringify(trimmed));
+}
+
+function aiGetCurrent() {
+  return aiChats.find(c => c.id === aiCurrentId) || null;
+}
 
 function renderAiChat() {
   const ct = document.getElementById('aiContent');
   if (!ct) return;
-  if (ct.dataset.loaded) return;
-  ct.dataset.loaded = '1';
+  // Load from localStorage
+  aiChats = JSON.parse(localStorage.getItem('fe_ai_chats') || '[]');
+  if (aiChats.length === 0) aiNewChat(false);
+  if (!aiCurrentId || !aiChats.find(c => c.id === aiCurrentId)) {
+    aiCurrentId = aiChats[aiChats.length - 1]?.id || null;
+  }
   ct.innerHTML = `
-    <div style="max-width:680px;margin:0 auto">
-      <div style="margin-bottom:20px">
-        <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:4px">🤖 AI Support Agent</h2>
-        <p style="font-size:.82rem;color:var(--muted)">Ask anything about Falcao External. Available 24/7.</p>
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:16px;max-width:900px;margin:0 auto;height:520px">
+      <!-- Sidebar -->
+      <div style="background:var(--card);border:1px solid var(--stroke);border-radius:14px;display:flex;flex-direction:column;overflow:hidden">
+        <div style="padding:10px;border-bottom:1px solid var(--stroke)">
+          <button onclick="aiNewChat(true)" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:9px;padding:9px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit">+ New Chat</button>
+        </div>
+        <div id="aiChatList" style="flex:1;overflow-y:auto;padding:6px"></div>
       </div>
-      <div id="aiMessages" style="background:var(--card);border:1px solid var(--stroke);border-radius:14px;
-        padding:16px;min-height:340px;max-height:480px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;margin-bottom:12px">
-        <div class="ai-msg ai-bot" style="align-self:flex-start;max-width:85%;background:var(--card2);border-radius:12px;padding:12px 14px;font-size:.85rem;line-height:1.6">
-          👋 Hi! I'm the Falcao External support agent. I can help you with features, pricing, how to use the menu, and more. What do you need?
+      <!-- Chat area -->
+      <div style="background:var(--card);border:1px solid var(--stroke);border-radius:14px;display:flex;flex-direction:column;overflow:hidden">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--stroke);font-size:.85rem;font-weight:600" id="aiChatTitle">AI Support Agent</div>
+        <div id="aiMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px"></div>
+        <div style="padding:12px 16px;border-top:1px solid var(--stroke);display:flex;gap:8px">
+          <input id="aiInput" type="text" placeholder="Ask a question..." autocomplete="off"
+            style="flex:1;background:var(--card2);border:1px solid var(--stroke);color:var(--text);
+            font-family:inherit;font-size:.85rem;padding:10px 13px;border-radius:9px;outline:none"
+            onkeydown="if(event.key==='Enter')sendAiMessage()"/>
+          <button onclick="sendAiMessage()" id="aiSendBtn"
+            style="background:var(--accent);color:#fff;border:none;border-radius:9px;padding:10px 16px;
+            font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">Send</button>
         </div>
       </div>
-      <div style="display:flex;gap:8px">
-        <input id="aiInput" type="text" placeholder="Ask a question..." autocomplete="off"
-          style="flex:1;background:var(--card2);border:1px solid var(--stroke);color:var(--text);
-          font-family:inherit;font-size:.88rem;padding:12px 14px;border-radius:10px;outline:none;transition:border-color .14s"
-          onkeydown="if(event.key==='Enter')sendAiMessage()"/>
-        <button onclick="sendAiMessage()" id="aiSendBtn"
-          style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 18px;
-          font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:opacity .13s">
-          Send
-        </button>
-      </div>
     </div>`;
-  document.getElementById('aiInput').focus();
+  aiRenderList();
+  aiRenderMessages();
+  document.getElementById('aiInput')?.focus();
+}
+
+function aiRenderList() {
+  const list = document.getElementById('aiChatList');
+  if (!list) return;
+  list.innerHTML = aiChats.slice().reverse().map(c => `
+    <div onclick="aiSelectChat('${c.id}')" style="padding:8px 10px;border-radius:8px;cursor:pointer;font-size:.8rem;
+      margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+      background:${c.id === aiCurrentId ? 'rgba(232,88,34,.15)' : 'transparent'};
+      color:${c.id === aiCurrentId ? 'var(--accent)' : 'var(--muted)'};
+      border:1px solid ${c.id === aiCurrentId ? 'rgba(232,88,34,.3)' : 'transparent'}" title="${c.name}">
+      ${c.name}
+    </div>`).join('');
+}
+
+function aiRenderMessages() {
+  const msgs = document.getElementById('aiMessages');
+  const title = document.getElementById('aiChatTitle');
+  if (!msgs) return;
+  const chat = aiGetCurrent();
+  if (!chat) return;
+  if (title) title.textContent = chat.name;
+  msgs.innerHTML = '';
+  if (!chat.messages.length) {
+    const welcome = document.createElement('div');
+    welcome.style.cssText = 'align-self:flex-start;max-width:85%;background:var(--card2);border-radius:10px;padding:10px 13px;font-size:.84rem;line-height:1.6;color:var(--text)';
+    welcome.textContent = 'Hi! Ask me anything about Falcao External.';
+    msgs.appendChild(welcome);
+  }
+  for (const m of chat.messages) {
+    const b = document.createElement('div');
+    if (m.role === 'user') {
+      b.style.cssText = 'align-self:flex-end;max-width:85%;background:rgba(232,88,34,.15);border:1px solid rgba(232,88,34,.25);border-radius:10px;padding:10px 13px;font-size:.84rem;line-height:1.6';
+    } else {
+      b.style.cssText = 'align-self:flex-start;max-width:85%;background:var(--card2);border-radius:10px;padding:10px 13px;font-size:.84rem;line-height:1.6;white-space:pre-wrap';
+    }
+    b.textContent = m.text;
+    msgs.appendChild(b);
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function aiNewChat(render = true) {
+  const id = 'chat-' + Date.now();
+  const name = 'Chat ' + (aiChats.length + 1);
+  aiChats.push({ id, name, messages: [] });
+  aiCurrentId = id;
+  aiSaveChats();
+  if (render) { aiRenderList(); aiRenderMessages(); document.getElementById('aiInput')?.focus(); }
+}
+
+function aiSelectChat(id) {
+  aiCurrentId = id;
+  aiRenderList();
+  aiRenderMessages();
+  document.getElementById('aiInput')?.focus();
 }
 
 async function sendAiMessage() {
@@ -1354,17 +1431,20 @@ async function sendAiMessage() {
   input.value = '';
   btn.disabled = true; btn.textContent = '...';
 
-  // Add user bubble
-  const userBubble = document.createElement('div');
-  userBubble.style.cssText = 'align-self:flex-end;max-width:85%;background:rgba(232,88,34,.15);border:1px solid rgba(232,88,34,.25);border-radius:12px;padding:12px 14px;font-size:.85rem;line-height:1.6';
-  userBubble.textContent = msg;
-  msgs.appendChild(userBubble);
-  msgs.scrollTop = msgs.scrollHeight;
+  const chat = aiGetCurrent();
+  if (!chat) { btn.disabled = false; btn.textContent = 'Send'; return; }
+
+  // User bubble
+  chat.messages.push({ role: 'user', text: msg, ts: Date.now() });
+  // Update chat name from first message
+  if (chat.messages.length === 1) chat.name = msg.slice(0, 28) + (msg.length > 28 ? '…' : '');
+  aiSaveChats();
+  aiRenderMessages();
 
   // Typing indicator
   const typing = document.createElement('div');
-  typing.style.cssText = 'align-self:flex-start;max-width:85%;background:var(--card2);border-radius:12px;padding:12px 14px;font-size:.85rem;color:var(--muted)';
-  typing.textContent = '⏳ Thinking...';
+  typing.style.cssText = 'align-self:flex-start;color:var(--muted);font-size:.82rem;padding:6px 2px';
+  typing.textContent = 'Thinking...';
   msgs.appendChild(typing);
   msgs.scrollTop = msgs.scrollHeight;
 
@@ -1373,32 +1453,27 @@ async function sendAiMessage() {
       method: 'POST',
       body: JSON.stringify({
         message: msg,
-        sessionId: aiSessionId,
+        sessionId: chat.id,
         discordId: currentUser?.discordId,
         discordUsername: currentUser?.discordUsername
       })
     });
     typing.remove();
     if (data.ok) {
-      aiSessionId = data.sessionId;
-      const botBubble = document.createElement('div');
-      botBubble.style.cssText = 'align-self:flex-start;max-width:85%;background:var(--card2);border-radius:12px;padding:12px 14px;font-size:.85rem;line-height:1.6;white-space:pre-wrap';
-      botBubble.textContent = data.reply;
-      msgs.appendChild(botBubble);
+      chat.messages.push({ role: 'agent', text: data.reply, ts: Date.now() });
+      aiSaveChats();
+      aiRenderMessages();
     } else {
-      const errBubble = document.createElement('div');
-      errBubble.style.cssText = 'align-self:flex-start;color:#ef4444;font-size:.82rem;padding:8px';
-      errBubble.textContent = '❌ ' + (data.message || 'Error. Try again.');
-      msgs.appendChild(errBubble);
+      chat.messages.push({ role: 'agent', text: '❌ ' + (data.message || 'Error.'), ts: Date.now() });
+      aiSaveChats();
+      aiRenderMessages();
     }
   } catch (e) {
     typing.remove();
-    const errBubble = document.createElement('div');
-    errBubble.style.cssText = 'align-self:flex-start;color:#ef4444;font-size:.82rem;padding:8px';
-    errBubble.textContent = '❌ Network error.';
-    msgs.appendChild(errBubble);
+    chat.messages.push({ role: 'agent', text: '❌ Network error.', ts: Date.now() });
+    aiSaveChats();
+    aiRenderMessages();
   }
-  msgs.scrollTop = msgs.scrollHeight;
   btn.disabled = false; btn.textContent = 'Send';
   input.focus();
 }
