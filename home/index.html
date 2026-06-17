@@ -409,10 +409,12 @@
         <button class="dash-tab active" data-dtab="profile" onclick="dashTab('profile')">Profile</button>
         <button class="dash-tab" data-dtab="settings" onclick="dashTab('settings')">Settings</button>
         <button class="dash-tab" data-dtab="referrals" onclick="dashTab('referrals')">Referrals</button>
+        <button class="dash-tab" data-dtab="ai" onclick="dashTab('ai')">🤖 AI Agent</button>
       </div>
       <div id="dtab-profile" class="dtab-panel active"><div id="dashContent"></div></div>
       <div id="dtab-settings" class="dtab-panel"><div id="settingsContent"></div></div>
       <div id="dtab-referrals" class="dtab-panel"><div id="referralsContent"></div></div>
+      <div id="dtab-ai" class="dtab-panel"><div id="aiContent"></div></div>
     </div>
   </div>
 </div>
@@ -453,6 +455,7 @@ function dashTab(tabId) {
   if (tabId === 'profile') renderDashboard();
   if (tabId === 'settings') renderSettings();
   if (tabId === 'referrals') renderReferrals();
+  if (tabId === 'ai') renderAiChat();
 }
 
 // ── API helper ─────────────────────────────────────────────────────────────
@@ -1124,6 +1127,19 @@ async function renderManage() {
     await api('/api/manage/auth/autologin', { method: 'POST', body: JSON.stringify({ discordId: currentUser.discordId }) });
   } catch (_) {}
   loadManageKeys(1);
+
+  // Append AI conversations panel after keys card
+  const aiPanel = document.createElement('div');
+  aiPanel.className = 'card';
+  aiPanel.style.marginTop = '20px';
+  aiPanel.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-weight:700;font-size:.9rem">🤖 AI Agent Conversations</span>
+      <button onclick="loadAiConversations()" style="background:rgba(232,88,34,.12);color:var(--accent);border:1px solid rgba(232,88,34,.3);border-radius:8px;padding:5px 12px;font-size:.78rem;cursor:pointer;font-family:inherit">↻ Refresh</button>
+    </div>
+    <div id="aiConvsContainer"><div style="color:var(--muted);font-size:.82rem">Loading...</div></div>`;
+  ct.appendChild(aiPanel);
+  loadAiConversations();
 }
 
 window._mgPage = 1;
@@ -1275,6 +1291,131 @@ function setPref(key, value, btn) {
   document.querySelectorAll(`#${key}Btns .pref-btn`).forEach(b => b.classList.remove('pref-active'));
   btn.classList.add('pref-active');
   if (key === 'currency') { pricesCache = null; const g = document.getElementById('purchaseGrid'); if (g) delete g.dataset.loaded; }
+}
+
+// ── AI CHAT ────────────────────────────────────────────────────────────────
+let aiSessionId = null;
+
+function renderAiChat() {
+  const ct = document.getElementById('aiContent');
+  if (!ct) return;
+  if (ct.dataset.loaded) return;
+  ct.dataset.loaded = '1';
+  ct.innerHTML = `
+    <div style="max-width:680px;margin:0 auto">
+      <div style="margin-bottom:20px">
+        <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:4px">🤖 AI Support Agent</h2>
+        <p style="font-size:.82rem;color:var(--muted)">Ask anything about Falcao External. Available 24/7.</p>
+      </div>
+      <div id="aiMessages" style="background:var(--card);border:1px solid var(--stroke);border-radius:14px;
+        padding:16px;min-height:340px;max-height:480px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;margin-bottom:12px">
+        <div class="ai-msg ai-bot" style="align-self:flex-start;max-width:85%;background:var(--card2);border-radius:12px;padding:12px 14px;font-size:.85rem;line-height:1.6">
+          👋 Hi! I'm the Falcao External support agent. I can help you with features, pricing, how to use the menu, and more. What do you need?
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="aiInput" type="text" placeholder="Ask a question..." autocomplete="off"
+          style="flex:1;background:var(--card2);border:1px solid var(--stroke);color:var(--text);
+          font-family:inherit;font-size:.88rem;padding:12px 14px;border-radius:10px;outline:none;transition:border-color .14s"
+          onkeydown="if(event.key==='Enter')sendAiMessage()"/>
+        <button onclick="sendAiMessage()" id="aiSendBtn"
+          style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 18px;
+          font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:opacity .13s">
+          Send
+        </button>
+      </div>
+    </div>`;
+  document.getElementById('aiInput').focus();
+}
+
+async function sendAiMessage() {
+  const input = document.getElementById('aiInput');
+  const btn = document.getElementById('aiSendBtn');
+  const msgs = document.getElementById('aiMessages');
+  if (!input || !msgs) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  btn.disabled = true; btn.textContent = '...';
+
+  // Add user bubble
+  const userBubble = document.createElement('div');
+  userBubble.style.cssText = 'align-self:flex-end;max-width:85%;background:rgba(232,88,34,.15);border:1px solid rgba(232,88,34,.25);border-radius:12px;padding:12px 14px;font-size:.85rem;line-height:1.6';
+  userBubble.textContent = msg;
+  msgs.appendChild(userBubble);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.style.cssText = 'align-self:flex-start;max-width:85%;background:var(--card2);border-radius:12px;padding:12px 14px;font-size:.85rem;color:var(--muted)';
+  typing.textContent = '⏳ Thinking...';
+  msgs.appendChild(typing);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const data = await api('/api/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: msg,
+        sessionId: aiSessionId,
+        discordId: currentUser?.discordId,
+        discordUsername: currentUser?.discordUsername
+      })
+    });
+    typing.remove();
+    if (data.ok) {
+      aiSessionId = data.sessionId;
+      const botBubble = document.createElement('div');
+      botBubble.style.cssText = 'align-self:flex-start;max-width:85%;background:var(--card2);border-radius:12px;padding:12px 14px;font-size:.85rem;line-height:1.6;white-space:pre-wrap';
+      botBubble.textContent = data.reply;
+      msgs.appendChild(botBubble);
+    } else {
+      const errBubble = document.createElement('div');
+      errBubble.style.cssText = 'align-self:flex-start;color:#ef4444;font-size:.82rem;padding:8px';
+      errBubble.textContent = '❌ ' + (data.message || 'Error. Try again.');
+      msgs.appendChild(errBubble);
+    }
+  } catch (e) {
+    typing.remove();
+    const errBubble = document.createElement('div');
+    errBubble.style.cssText = 'align-self:flex-start;color:#ef4444;font-size:.82rem;padding:8px';
+    errBubble.textContent = '❌ Network error.';
+    msgs.appendChild(errBubble);
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+  btn.disabled = false; btn.textContent = 'Send';
+  input.focus();
+}
+
+// ── AI CONVERSATIONS IN MANAGE ─────────────────────────────────────────────
+async function loadAiConversations() {
+  const ct = document.getElementById('aiConvsContainer');
+  if (!ct) return;
+  ct.innerHTML = '<div style="color:var(--muted);font-size:.82rem;padding:12px">Loading...</div>';
+  try {
+    const d = await api('/api/ai/conversations');
+    const convs = d.conversations || [];
+    if (!convs.length) { ct.innerHTML = '<div style="color:var(--muted);font-size:.82rem;padding:12px">No conversations yet.</div>'; return; }
+    ct.innerHTML = convs.slice(0, 50).map(c => `
+      <div style="background:var(--card2);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer" onclick="this.querySelector('.ai-turns').style.display=this.querySelector('.ai-turns').style.display==='none'?'block':'none'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-weight:600;font-size:.85rem">${c.discordUsername || 'Anonymous'} <span style="color:var(--muted);font-weight:400;font-size:.75rem">${c.source === 'discord_ticket' ? '📨 Ticket' : '🌐 Web'}</span></span>
+          <span style="font-size:.72rem;color:var(--muted)">${new Date(c.startedAt).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'})}</span>
+        </div>
+        <div style="font-size:.75rem;color:var(--muted)">${c.turns.length} message${c.turns.length !== 1 ? 's' : ''}</div>
+        <div class="ai-turns" style="display:none;margin-top:12px;border-top:1px solid var(--stroke);padding-top:10px">
+          ${c.turns.map(t => `
+            <div style="margin-bottom:10px">
+              <div style="font-size:.72rem;color:var(--accent);font-weight:600;margin-bottom:3px">User:</div>
+              <div style="font-size:.8rem;background:rgba(232,88,34,.08);border-radius:8px;padding:8px 10px">${t.user}</div>
+              <div style="font-size:.72rem;color:#7c8cf8;font-weight:600;margin:5px 0 3px">Agent:</div>
+              <div style="font-size:.8rem;background:rgba(88,101,242,.08);border-radius:8px;padding:8px 10px;white-space:pre-wrap">${t.agent}</div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  } catch (e) {
+    ct.innerHTML = `<div style="color:#ef4444;font-size:.82rem;padding:12px">Error: ${e.message}</div>`;
+  }
 }
 
 function getPref(key, def) { return localStorage.getItem('fe_' + key) || def; }

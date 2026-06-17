@@ -19,6 +19,7 @@ const { mountAccountApi } = require("./account");
 const { appendKeyLog, mountKeyLogsApi } = require("./key-logs");
 const { mountPaymentsApi, pendingOrders } = require("./payments");
 const { mountReferralsApi } = require("./referrals");
+const { chat: aiChat, mountAiApi } = require("./ai-agent");
 const TOKEN = process.env.DISCORD_TOKEN;
 const PREFIX = process.env.PREFIX || "!";
 const API_PORT = Number(process.env.PORT || process.env.API_PORT || 3000);
@@ -1248,6 +1249,7 @@ mountPaymentsApi(app, {
 });
 
 mountReferralsApi(app, { dataDir });
+mountAiApi(app, { dataDir });
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers]
@@ -1528,8 +1530,45 @@ setInterval(async () => {
   }
 }, 60 * 1000);
 
+// Track which channels are ticket channels for AI responses
+const aiRespondedChannels = new Set();
+
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
+
+  // ── AI agent in ticket channels ──────────────────────────────────────
+  const parentName = message.channel.parent?.name?.toLowerCase() || "";
+  const channelName = message.channel.name?.toLowerCase() || "";
+  const isTicketChannel =
+    parentName.includes("ticket") ||
+    channelName.startsWith("buy-") ||
+    channelName.startsWith("support-") ||
+    channelName.startsWith("hwid-reset") ||
+    channelName.startsWith("bug-");
+
+  if (isTicketChannel && message.content && message.content.trim().length > 1) {
+    try {
+      const sessionId = `discord-${message.channel.id}`;
+      await message.channel.sendTyping();
+      const reply = await aiChat(sessionId, message.content.trim(), {
+        source: "discord_ticket",
+        discordId: message.author.id,
+        discordUsername: message.author.tag,
+        channelId: message.channel.id
+      });
+      // Split long messages
+      if (reply.length > 1950) {
+        const chunks = reply.match(/.{1,1950}/gs) || [reply];
+        for (const chunk of chunks) await message.reply(chunk);
+      } else {
+        await message.reply(reply);
+      }
+    } catch (e) {
+      console.error("[ai-agent] Discord reply error:", e.message);
+    }
+    return;
+  }
+
   if (!message.content.startsWith(PREFIX)) return;
   await message.reply("Commands are now slash-only. Please use `/` commands.");
 });
