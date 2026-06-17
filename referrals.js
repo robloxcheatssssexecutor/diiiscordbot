@@ -1,6 +1,6 @@
 /**
  * referrals.js
- * Simple referral program: generate code, track earnings, request withdrawal.
+ * Referral program in EUR. Balance usable to pay for keys at checkout.
  */
 
 const fs   = require("fs");
@@ -37,11 +37,9 @@ function getOrCreate(db, discordId) {
     db.users[discordId] = {
       discordId,
       code: null,
-      balance: 0,
-      totalEarned: 0,
-      withdrawn: 0,
+      balance: 0,       // EUR
+      totalEarned: 0,   // EUR
       sales: 0,
-      payouts: [],
       recentEarnings: []
     };
   }
@@ -56,23 +54,22 @@ function mountReferralsApi(app, deps) {
   // GET status
   app.get("/api/referrals/status", (req, res) => {
     const { discordId } = req.query;
-    if (!discordId) return res.status(400).json({ ok: false, message: "Falta discordId." });
+    if (!discordId) return res.status(400).json({ ok: false, message: "Missing discordId." });
     const db = readDb();
     const user = db.users[discordId];
-    if (!user) return res.json({ ok: true, balance: 0, totalEarned: 0, withdrawn: 0, sales: 0, code: null, payouts: [], recentEarnings: [] });
+    if (!user) return res.json({ ok: true, balance: 0, totalEarned: 0, sales: 0, code: null, recentEarnings: [] });
     res.json({ ok: true, ...user });
   });
 
-  // GET validate ref code (used at checkout)
+  // GET validate ref code
   app.get("/api/referrals/validate", (req, res) => {
     const { code, discordId } = req.query;
-    if (!code) return res.status(400).json({ ok: false, message: "Falta código." });
+    if (!code) return res.status(400).json({ ok: false, message: "Missing code." });
     const db = readDb();
     const owner = Object.values(db.users).find(u => u.code === code.toUpperCase());
-    if (!owner) return res.status(404).json({ ok: false, message: "Código no válido." });
-    // Cannot use your own code
+    if (!owner) return res.status(404).json({ ok: false, message: "Invalid code." });
     if (discordId && owner.discordId === discordId) {
-      return res.status(400).json({ ok: false, message: "No puedes usar tu propio código." });
+      return res.status(400).json({ ok: false, message: "You cannot use your own referral code." });
     }
     res.json({ ok: true, code: owner.code, referrerId: owner.discordId });
   });
@@ -80,11 +77,10 @@ function mountReferralsApi(app, deps) {
   // POST generate code
   app.post("/api/referrals/generate", (req, res) => {
     const { discordId } = req.body || {};
-    if (!discordId) return res.status(400).json({ ok: false, message: "Falta discordId." });
+    if (!discordId) return res.status(400).json({ ok: false, message: "Missing discordId." });
     const db = readDb();
     const user = getOrCreate(db, discordId);
     if (!user.code) {
-      // ensure unique
       let code = generateCode();
       const allCodes = Object.values(db.users).map(u => u.code);
       while (allCodes.includes(code)) code = generateCode();
@@ -94,48 +90,44 @@ function mountReferralsApi(app, deps) {
     res.json({ ok: true, code: user.code });
   });
 
-  // POST withdraw request (sends webhook to admin, does not auto-process)
-  app.post("/api/referrals/withdraw", async (req, res) => {
-    const { discordId, address, amount, crypto: cryptoType } = req.body || {};
-    if (!discordId || !address || !amount) return res.status(400).json({ ok: false, message: "Faltan campos." });
-    const db = readDb();
-    const user = db.users[discordId];
-    if (!user) return res.status(404).json({ ok: false, message: "Usuario no encontrado." });
-    if (user.balance < 25) return res.status(400).json({ ok: false, message: "Saldo insuficiente. Mínimo $25." });
-    if (Number(amount) > user.balance) return res.status(400).json({ ok: false, message: "Cantidad superior al saldo disponible." });
-
-    // Log the request
-    user.payouts.push({ date: new Date().toISOString(), amount: Number(amount), crypto: cryptoType || "ltc", address, status: "pending" });
-    writeDb(db);
-
-    // Notify admin via webhook if configured
-    const webhookUrl = process.env.PAYMENT_DISCORD_WEBHOOK;
-    if (webhookUrl) {
-      fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: `💸 **Referral Withdrawal Request**\nDiscord: <@${discordId}>\nAmount: **$${amount}**\nCrypto: ${cryptoType || "ltc"}\nAddress: \`${address}\`` })
-      }).catch(() => {});
-    }
-
-    res.json({ ok: true, message: "Solicitud enviada. Se procesará en 72 horas." });
-  });
-
-  // POST credit earnings (called internally when a referred sale completes)
+  // POST credit earnings (called from payments.js after delivery)
   app.post("/api/referrals/credit", (req, res) => {
     const { referrerDiscordId, amount } = req.body || {};
     if (!referrerDiscordId || !amount) return res.status(400).json({ ok: false });
     const db = readDb();
     const user = getOrCreate(db, referrerDiscordId);
-    const earned = Number(amount);
+    const earned = Number(Number(amount).toFixed(2));
     user.balance = Number((user.balance + earned).toFixed(2));
     user.totalEarned = Number((user.totalEarned + earned).toFixed(2));
     user.sales = (user.sales || 0) + 1;
     user.recentEarnings = user.recentEarnings || [];
     user.recentEarnings.unshift({ date: new Date().toISOString(), amount: earned });
-    if (user.recentEarnings.length > 20) user.recentEarnings = user.recentEarnings.slice(0, 20);
+    if (user.recentEarnings.length > 30) user.recentEarnings = user.recentEarnings.slice(0, 30);
     writeDb(db);
     res.json({ ok: true });
+  });
+
+  // POST use balance to pay for a key (full or partial)
+  // Returns: { ok, appliedAmount, remainingPrice, newBalance }
+  app.post("/api/referrals/use-balance", (req, res) => {
+    const { discordId, priceEur } = req.body || {};
+    if (!discordId || priceEur == null) {
+      return res.status(400).json({ ok: false, message: "Missing discordId or priceEur." });
+    }
+    const price = Number(priceEur);
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ ok: false, message: "Invalid price." });
+    }
+    const db = readDb();
+    const user = db.users[discordId];
+    if (!user || user.balance <= 0) {
+      return res.json({ ok: true, appliedAmount: 0, remainingPrice: price, newBalance: 0 });
+    }
+    const applied = Number(Math.min(user.balance, price).toFixed(2));
+    const remaining = Number(Math.max(0, price - applied).toFixed(2));
+    user.balance = Number((user.balance - applied).toFixed(2));
+    writeDb(db);
+    res.json({ ok: true, appliedAmount: applied, remainingPrice: remaining, newBalance: user.balance });
   });
 }
 

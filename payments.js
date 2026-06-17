@@ -567,13 +567,67 @@ function mountPaymentsApi(app, deps) {
       } catch (_) {}
     }
 
+    // Apply referral balance if requested
+    const useBalance = req.body.useBalance === true;
+    let finalPrice = priceEur;
+    let balanceApplied = 0;
+    if (useBalance && discordId) {
+      try {
+        const balRes = await fetch(`http://localhost:${process.env.PORT || 3000}/api/referrals/use-balance`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ discordId, priceEur })
+        });
+        const balData = await balRes.json();
+        if (balData.ok) {
+          balanceApplied = balData.appliedAmount;
+          finalPrice = balData.remainingPrice;
+        }
+      } catch (_) {}
+    }
+
+    // If fully covered by balance, deliver key directly
+    if (finalPrice <= 0 && useBalance) {
+      const fakeOrder = {
+        orderId: `BAL-${Date.now()}`,
+        method: "balance",
+        plan: licensePlan,
+        durationDays,
+        priceEur: 0,
+        discordId: String(discordId),
+        discordUsername: String(discordUsername || discordId),
+        status: "pending_payment",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + ORDER_EXPIRY_MS,
+        keyDelivered: null,
+        ltcAmountExpected: null,
+        stripeSessionId: null,
+        stripeSessionUrl: null,
+        refCode: refCode || null,
+        referrerId: referrerId || null
+      };
+      const deliverDeps2 = { readDb, writeDb, generateKey, getKeyRecord, calcExpiresAt, normalizePlan, appendKeyLog, dataDir };
+      const key = deliverKey(fakeOrder, deliverDeps2);
+      fakeOrder.keyDelivered = key;
+      fakeOrder.status = "delivered";
+      saveOrder(fakeOrder);
+      // DM user
+      if (getDiscordClient() && getDiscordClient().isReady()) {
+        try {
+          const user = await getDiscordClient().users.fetch(discordId);
+          await user.send(`✅ **Key delivered using your referral balance!**\n\nKey: \`${key}\`\nPlan: **${licensePlan}** · ${durationDays === 36500 ? "Lifetime" : durationDays + "d"}\n\nYou can claim it at https://falcaobot.onrender.com/?tab=dashboard`);
+        } catch (_) {}
+      }
+      return res.json({ ok: true, method: "balance", orderId: fakeOrder.orderId, key, balanceApplied, priceEur: 0 });
+    }
+
     const orderId = makeOrderId();
     const order = {
       orderId,
       method,
       plan: licensePlan,
       durationDays,
-      priceEur,
+      priceEur: finalPrice,
       discordId: String(discordId),
       discordUsername: String(discordUsername || discordId),
       status: "pending_payment",
