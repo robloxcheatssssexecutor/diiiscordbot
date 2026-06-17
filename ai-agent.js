@@ -9,7 +9,9 @@ const path = require("path");
 const crypto = require("crypto");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const SYSTEM_PROMPT = `You are the official support agent for "Falcao External", a FiveM external cheat menu.
 
@@ -90,43 +92,66 @@ function listConversations() {
   } catch (_) { return []; }
 }
 
-// ── Gemini call ────────────────────────────────────────────────────────────
+// ── Groq call (primary — free tier) ───────────────────────────────────────
+async function askGroq(history, userMessage) {
+  if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured.");
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...history.slice(-10).map(h => ({ role: h.role === "model" ? "assistant" : "user", content: h.parts[0].text })),
+    { role: "user", content: userMessage }
+  ];
+  const res = await fetch(GROQ_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
+    body: JSON.stringify({ model: "llama-3.1-8b-instant", messages, max_tokens: 512, temperature: 0.7 })
+  });
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    console.error("[ai-agent] Groq error:", res.status, err.slice(0, 400));
+    throw new Error(`Groq API error ${res.status}: ${err.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error("Empty response from Groq.");
+  return text.trim();
+}
+
+// ── Gemini call (fallback) ─────────────────────────────────────────────────
 async function askGemini(history, userMessage) {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured.");
-
-  // Build contents array — system prompt as first user turn
   const contents = [
     { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
     { role: "model", parts: [{ text: "Understood. I'm ready to help Falcao External users." }] },
-    ...history.slice(-10), // keep last 10 turns for context
+    ...history.slice(-10),
     { role: "user", parts: [{ text: userMessage }] }
   ];
-
   const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents,
-      generationConfig: { maxOutputTokens: 512, temperature: 0.7 }
-    })
+    body: JSON.stringify({ contents, generationConfig: { maxOutputTokens: 512, temperature: 0.7 } })
   });
-
   if (!res.ok) {
     const err = await res.text().catch(() => "");
     console.error("[ai-agent] Gemini error:", res.status, err.slice(0, 500));
     throw new Error(`Gemini API error ${res.status}: ${err.slice(0, 200)}`);
   }
-
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Empty response from Gemini.");
   return text.trim();
 }
 
+// ── Main ask — tries Groq first, falls back to Gemini ─────────────────────
+async function askAI(history, userMessage) {
+  if (GROQ_API_KEY) return askGroq(history, userMessage);
+  if (GEMINI_API_KEY) return askGemini(history, userMessage);
+  throw new Error("No AI API key configured. Set GROQ_API_KEY or GEMINI_API_KEY.");
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────
 async function chat(sessionId, userMessage, meta = {}) {
   let history = conversations.get(sessionId) || [];
-  const reply = await askGemini(history, userMessage);
+  const reply = await askAI(history, userMessage);
   history = [
     ...history,
     { role: "user",  parts: [{ text: userMessage }], ts: Date.now() },
