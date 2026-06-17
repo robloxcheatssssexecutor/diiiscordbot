@@ -45,6 +45,9 @@ Vehicle Boost, Traction mod, Carry Vehicle, Repair Vehicle, Vehicle Godmode, Eng
 **Exploits — Macros:**
 Strafe macro (WASD patterns, hold/toggle mode, configurable timing)
 
+**Exploits — TxAdmin:**
+Built-in TxAdmin menu integration. Allows opening the TxAdmin panel, showing player IDs, and interacting with server admin tools directly from the menu. Accessible via the Exploits tab.
+
 **Misc:**
 Crosshair, FOV circles for aimbot/silent/triggerbot/magicbullet, Aimbot target line, Panic key, Menu key, Capture Bypass (OBS stream-proof), GPU Capture Bypass, Second Monitor mode, Mobile Control Only mode, Background snow, Thread delay, Quick binds (visuals, godmode, invisible, noclip, vehicle tuning), FPS limit, Low performance mode
 
