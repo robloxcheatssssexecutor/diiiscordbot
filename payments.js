@@ -269,9 +269,9 @@ function deliverKey(order, deps) {
     }
   }
 
-  // Credit referrer 15% if a valid refCode was used
+  // Credit referrer 20% if a valid refCode was used
   if (order.referrerId && order.referrerId !== order.discordId) {
-    const commission = Number((order.priceEur * 0.15).toFixed(2));
+    const commission = Number((order.priceEur * 0.20).toFixed(2));
     try {
       fetch(`http://localhost:${process.env.PORT || 3000}/api/referrals/credit`, {
         method: "POST",

@@ -585,7 +585,7 @@ async function validateRefCode() {
     const data = await api(`/api/referrals/validate?code=${encodeURIComponent(code)}&discordId=${encodeURIComponent(discordId)}`);
     if (data.ok) {
       status.style.color = '#22c55e';
-      status.textContent = '✅ Valid code — 15% of your purchase will go to the referrer.';
+      status.textContent = '✅ Valid code — 20% of your purchase will go to the referrer.';
     } else {
       status.style.color = '#ef4444';
       status.textContent = '❌ ' + (data.message || 'Invalid code.');
@@ -831,7 +831,7 @@ async function renderSettings() {
       <div class="settings-card">
         <div class="referral-mini">
           <h3>Referral Program</h3>
-          <p>Earn <b>15% of every sale</b> made through your personal link.<br>Your balance can be spent on keys.</p>
+          <p>Earn <b>20% of every sale</b> made through your personal link.<br>Your balance can be spent on keys.</p>
           <button class="btn-settings btn-s-outline" style="max-width:300px;margin:0 auto" onclick="dashTab('referrals')">GO TO REFERRALS →</button>
         </div>
       </div>
@@ -841,29 +841,20 @@ async function renderSettings() {
         <div style="margin-bottom:14px">
           <div style="font-size:.78rem;color:var(--muted);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Language</div>
           <div style="display:flex;gap:8px" id="langBtns">
-            <button onclick="setPref('lang','en',this)" id="pref-lang-en" class="pref-btn" style="flex:1;padding:9px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s">🇬🇧 English</button>
-            <button onclick="setPref('lang','es',this)" id="pref-lang-es" class="pref-btn" style="flex:1;padding:9px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s">🇪🇸 Español</button>
+            <button onclick="setPref('lang','en',this)" id="pref-lang-en" class="pref-btn${getPref('lang','en')==='en'?' pref-active':''}" style="flex:1;padding:9px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s">🇬🇧 English</button>
+            <button onclick="setPref('lang','es',this)" id="pref-lang-es" class="pref-btn${getPref('lang','en')==='es'?' pref-active':''}" style="flex:1;padding:9px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s">🇪🇸 Español</button>
           </div>
         </div>
         <div>
           <div style="font-size:.78rem;color:var(--muted);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Currency</div>
           <div style="display:flex;gap:8px" id="currencyBtns">
-            <button onclick="setPref('currency','eur',this)" id="pref-currency-eur" class="pref-btn" style="flex:1;padding:9px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s">€ Euro</button>
-            <button onclick="setPref('currency','usd',this)" id="pref-currency-usd" class="pref-btn" style="flex:1;padding:9px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s">$ Dollar</button>
+            <button onclick="setPref('currency','eur',this)" id="pref-currency-eur" class="pref-btn${getPref('currency','eur')==='eur'?' pref-active':''}" style="flex:1;padding:9px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s">€ Euro</button>
+            <button onclick="setPref('currency','usd',this)" id="pref-currency-usd" class="pref-btn${getPref('currency','eur')==='usd'?' pref-active':''}" style="flex:1;padding:9px;border-radius:9px;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--stroke);background:var(--card2);color:var(--muted);transition:all .13s">$ Dollar</button>
           </div>
         </div>
         <p style="font-size:.72rem;color:var(--muted);margin-top:10px">Currency conversion is approximate. Payments are processed in EUR.</p>
       </div>
     </div>`;
-  // Apply saved preferences to buttons
-  setTimeout(() => {
-    const lang = localStorage.getItem('fe_lang') || 'en';
-    const cur = localStorage.getItem('fe_currency') || 'eur';
-    const el1 = document.getElementById(`pref-lang-${lang}`);
-    const el2 = document.getElementById(`pref-currency-${cur}`);
-    if (el1) { el1.classList.add('pref-active'); }
-    if (el2) { el2.classList.add('pref-active'); }
-  }, 0);
   try {
     const kd = await api('/api/account/keys');
     const keys = kd.keys || [];
@@ -1003,7 +994,7 @@ async function renderReferrals() {
       <div style="font-size:.72rem;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">AFFILIATE</div>
       <h2 style="font-size:1.6rem;font-weight:900;letter-spacing:-.03em">Referral <span style="color:var(--accent)">Program</span></h2>
       <p style="color:var(--muted);font-size:.85rem;margin-top:6px;margin-bottom:24px">
-        Share Falcao External with your community and earn <b style="color:var(--text)">15% of every sale</b> made through your link.<br>
+        Share Falcao External with your community and earn <b style="color:var(--text)">20% of every sale</b> made through your link.<br>
         Your balance can be used to get discounts on keys.
       </p>
     </div>
@@ -1147,6 +1138,10 @@ async function renderManage() {
 
   document.getElementById('mgSearch').oninput = () => { clearTimeout(window._mgT); window._mgT = setTimeout(() => loadManageKeys(1), 350); };
   document.getElementById('mgStatus').onchange = () => loadManageKeys(1);
+  // Auto-login to manage session using account Discord ID
+  try {
+    await api('/api/manage/auth/autologin', { method: 'POST', body: JSON.stringify({ discordId: currentUser.discordId }) });
+  } catch (_) {}
   loadManageKeys(1);
 }
 
@@ -1220,12 +1215,12 @@ async function mgDelete(key) {
 
 function setPref(key, value, btn) {
   localStorage.setItem('fe_' + key, value);
-  // Update active state on all sibling buttons
-  btn.parentElement.querySelectorAll('.pref-btn').forEach(b => b.classList.remove('pref-active'));
+  document.querySelectorAll(`#${key}Btns .pref-btn`).forEach(b => b.classList.remove('pref-active'));
   btn.classList.add('pref-active');
-  // Force reload prices if currency changed
   if (key === 'currency') { pricesCache = null; const g = document.getElementById('purchaseGrid'); if (g) delete g.dataset.loaded; }
 }
+
+function getPref(key, def) { return localStorage.getItem('fe_' + key) || def; }
 
 async function initAuth() {
   const navRight = document.getElementById('navRight');
