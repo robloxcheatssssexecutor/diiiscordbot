@@ -49,7 +49,7 @@ Strafe macro (WASD patterns, hold/toggle mode, configurable timing)
 Crosshair, FOV circles for aimbot/silent/triggerbot/magicbullet, Aimbot target line, Panic key, Menu key, Capture Bypass (OBS stream-proof), GPU Capture Bypass, Second Monitor mode, Mobile Control Only mode, Background snow, Thread delay, Quick binds (visuals, godmode, invisible, noclip, vehicle tuning), FPS limit, Low performance mode
 
 **Bypass:**
-Built-in bypass accessible in the Settings tab of the menu. It clears all identifying strings and internal data to avoid detection by ss tools and scanners. Activate it before taking any ss. Included with all plans. No technical details can be shared.
+Built-in bypass in the Settings tab. With it active you appear completely clean on ss tools like Napse, Echo, and others — your ss will look 100% legit. Enable it before taking any ss. Included with all plans.
 
 **Mobile Panel:**
 Full control of all menu options from any browser on any device. Real-time sync. No extra installation needed.
