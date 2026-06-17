@@ -58,6 +58,7 @@ Full control of all menu options from any browser on any device. Real-time sync.
 - External Cheat + Bypass: Weekly / Monthly / Lifetime
 - External Cheat + Bypass + Spoofer: Weekly / Monthly / Lifetime
 - Payment methods: Stripe (card), Litecoin (auto-confirmed), PayPal F&F (manual)
+- To purchase, send users to: https://falcaobot.onrender.com/?tab=purchase
 
 **Account / Keys:**
 - Redeem key: Dashboard → Settings → Redeem License
@@ -124,10 +125,10 @@ function listConversations() {
 }
 
 // ── Groq call (primary — free tier) ───────────────────────────────────────
-async function askGroq(history, userMessage) {
+async function askGroq(history, userMessage, systemPrompt) {
   if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured.");
   const messages = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemPrompt || SYSTEM_PROMPT },
     ...history.slice(-10).map(h => ({ role: h.role === "model" ? "assistant" : "user", content: h.parts[0].text })),
     { role: "user", content: userMessage }
   ];
@@ -148,10 +149,11 @@ async function askGroq(history, userMessage) {
 }
 
 // ── Gemini call (fallback) ─────────────────────────────────────────────────
-async function askGemini(history, userMessage) {
+async function askGemini(history, userMessage, systemPrompt) {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured.");
+  const sp = systemPrompt || SYSTEM_PROMPT;
   const contents = [
-    { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
+    { role: "user", parts: [{ text: sp }] },
     { role: "model", parts: [{ text: "Understood. I'm ready to help Falcao External users." }] },
     ...history.slice(-10),
     { role: "user", parts: [{ text: userMessage }] }
@@ -173,22 +175,49 @@ async function askGemini(history, userMessage) {
 }
 
 // ── Main ask — tries Groq first, falls back to Gemini ─────────────────────
-async function askAI(history, userMessage) {
-  if (GROQ_API_KEY) return askGroq(history, userMessage);
-  if (GEMINI_API_KEY) return askGemini(history, userMessage);
+async function askAI(history, userMessage, systemPrompt) {
+  if (GROQ_API_KEY) return askGroq(history, userMessage, systemPrompt);
+  if (GEMINI_API_KEY) return askGemini(history, userMessage, systemPrompt);
   throw new Error("No AI API key configured. Set GROQ_API_KEY or GEMINI_API_KEY.");
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
+let _getWebPricesPayload = null;
+
+function buildPriceContext() {
+  if (!_getWebPricesPayload) return "";
+  try {
+    const data = _getWebPricesPayload();
+    const products = data.products || {};
+    const disc = data.discountPercent || 0;
+    const offer = data.offer || {};
+    const lines = ["Current prices (EUR):"];
+    for (const [, p] of Object.entries(products)) {
+      lines.push(`${p.name}:`);
+      if (p.week)     lines.push(`  - Weekly: €${p.week}`);
+      if (p.monthly)  lines.push(`  - Monthly: €${p.monthly}`);
+      if (p.lifetime) lines.push(`  - Lifetime: €${p.lifetime}`);
+    }
+    if (disc > 0 && offer.endsAt && new Date(offer.endsAt).getTime() > Date.now()) {
+      lines.push(`Active discount: -${disc}% — ends ${new Date(offer.endsAt).toLocaleDateString("en-GB")}`);
+      if (offer.customMessage) lines.push(`Offer message: ${offer.customMessage}`);
+    }
+    return lines.join("\n");
+  } catch (_) { return ""; }
+}
+
 async function chat(sessionId, userMessage, meta = {}) {
   let history = conversations.get(sessionId) || [];
-  const reply = await askAI(history, userMessage);
+  const priceCtx = buildPriceContext();
+  const effectivePrompt = priceCtx
+    ? SYSTEM_PROMPT + "\n\nLIVE PRICING DATA (always use these exact prices, ignore any others):\n" + priceCtx
+    : SYSTEM_PROMPT;
+  const reply = await askAI(history, userMessage, effectivePrompt);
   history = [
     ...history,
     { role: "user",  parts: [{ text: userMessage }], ts: Date.now() },
     { role: "model", parts: [{ text: reply }],        ts: Date.now() }
   ];
-  // Keep max 20 turns in memory
   if (history.length > 20) history = history.slice(-20);
   conversations.set(sessionId, history);
   saveConversation(sessionId, userMessage, reply, meta);
@@ -198,6 +227,7 @@ async function chat(sessionId, userMessage, meta = {}) {
 function mountAiApi(app, deps) {
   _dataDir  = deps.dataDir;
   _convsPath = path.join(_dataDir, "ai-conversations.json");
+  if (deps.getWebPricesPayload) _getWebPricesPayload = deps.getWebPricesPayload;
 
   // POST /api/ai/chat — web chat
   app.post("/api/ai/chat", async (req, res) => {
@@ -207,9 +237,7 @@ function mountAiApi(app, deps) {
     }
     const sessionId = sid || crypto.randomBytes(12).toString("hex");
     try {
-      const reply = await chat(sessionId, message.trim(), {
-        source: "web", discordId, discordUsername
-      });
+      const reply = await chat(sessionId, message.trim(), { source: "web", discordId, discordUsername });
       res.json({ ok: true, reply, sessionId });
     } catch (e) {
       console.error("[ai-agent] chat error:", e.message);

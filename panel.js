@@ -150,6 +150,15 @@ function mountPanelApi(app, deps) {
 
   setInterval(cleanupPanelSessions, 60 * 1000).unref();
 
+  // ── GET online keys (for manage indicator) ──────────────────────────────
+  app.get("/api/panel/online-keys", (_req, res) => {
+    const onlineKeys = [];
+    for (const [keyNorm, session] of panelSessions.entries()) {
+      if (isClientOnline(session)) onlineKeys.push(keyNorm);
+    }
+    res.json({ ok: true, onlineKeys });
+  });
+
   app.get("/api/panel/schema", (_req, res) => {
     res.json({ ok: true, schema: panelSchema });
   });

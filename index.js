@@ -601,16 +601,26 @@ async function restoreLoadersFromDiscord(clientInstance) {
     for (const msg of messages) {
       if (msg.author?.id !== clientInstance.user.id) continue;
       for (const loaderType of [...missing]) {
-        const attachment = msg.attachments.find(a =>
-          a.name && a.name.startsWith(`loader-${loaderType}-`)
-        );
+        // Try new b64.txt format first, then old direct format
+        const attachment =
+          msg.attachments.find(a => a.name && a.name.startsWith(`loader-${loaderType}-`) && a.name.endsWith(".b64.txt")) ||
+          msg.attachments.find(a => a.name && a.name.startsWith(`loader-${loaderType}-`));
         if (!attachment?.url) continue;
         try {
           const res = await fetch(attachment.url);
           if (!res.ok) continue;
-          const buf = Buffer.from(await res.arrayBuffer());
+          let buf;
+          if (attachment.name.endsWith(".b64.txt")) {
+            const b64 = await res.text();
+            buf = Buffer.from(b64.trim(), "base64");
+          } else {
+            buf = Buffer.from(await res.arrayBuffer());
+          }
           fs.mkdirSync(loadersDir, { recursive: true });
-          const fileName = attachment.name.replace(`loader-${loaderType}-`, "");
+          // Strip .b64.txt suffix to get real filename
+          const fileName = attachment.name
+            .replace(`loader-${loaderType}-`, "")
+            .replace(/\.b64\.txt$/, "");
           const filePath = path.join(loadersDir, fileName);
           fs.writeFileSync(filePath, buf);
           existingMeta[loaderType] = fileName;
@@ -1249,7 +1259,7 @@ mountPaymentsApi(app, {
 });
 
 mountReferralsApi(app, { dataDir });
-mountAiApi(app, { dataDir });
+mountAiApi(app, { dataDir, getWebPricesPayload });
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers]
@@ -2212,13 +2222,15 @@ client.on("interactionCreate", async (interaction) => {
         meta[loaderType] = safeFileName;
         fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
 
-        // Backup loader file to Discord backup channel so it survives restarts
+        // Backup loader as base64 txt — Discord blocks .exe files
         try {
           const backupChannel = await client.channels.fetch(KEYS_BACKUP_CHANNEL_ID);
           if (backupChannel && backupChannel.isTextBased()) {
-            const attachment = new AttachmentBuilder(buf, { name: `loader-${loaderType}-${safeFileName}` });
+            const b64 = buf.toString("base64");
+            const txtBuf = Buffer.from(b64, "utf8");
+            const attachment = new AttachmentBuilder(txtBuf, { name: `loader-${loaderType}-${safeFileName}.b64.txt` });
             await backupChannel.send({
-              content: `🔧 Loader backup • plan: **${loaderType}** • \`${safeFileName}\``,
+              content: `🔧 Loader backup • plan: ${loaderType} • \`${safeFileName}\``,
               files: [attachment]
             });
           }

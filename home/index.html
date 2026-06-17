@@ -1105,6 +1105,7 @@ async function renderManage() {
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:.79rem">
           <thead><tr style="color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em">
+            <th style="padding:8px 6px;width:18px"></th>
             <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Key</th>
             <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Plan</th>
             <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Status</th>
@@ -1114,7 +1115,7 @@ async function renderManage() {
             <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">HWID</th>
             <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--stroke)">Actions</th>
           </tr></thead>
-          <tbody id="mgBody"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Loading...</td></tr></tbody>
+          <tbody id="mgBody"><tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">Loading...</td></tr></tbody>
         </table>
       </div>
       <div id="mgPagination" style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:.82rem"></div>
@@ -1143,8 +1144,18 @@ async function renderManage() {
 }
 
 window._mgPage = 1;
+let _mgOnlineKeys = new Set();
+
+async function refreshOnlineKeys() {
+  try {
+    const d = await api('/api/panel/online-keys');
+    _mgOnlineKeys = new Set((d.onlineKeys || []).map(k => k.toUpperCase()));
+  } catch (_) {}
+}
+
 async function loadManageKeys(page) {
   window._mgPage = page;
+  await refreshOnlineKeys();
   const q = (document.getElementById('mgSearch') || {}).value || '';
   const st = (document.getElementById('mgStatus') || {}).value || '';
   const body = document.getElementById('mgBody');
@@ -1157,7 +1168,12 @@ async function loadManageKeys(page) {
     body.innerHTML = keys.length ? keys.map(k => {
       const days = daysLeft(k.expiresAt);
       const sc = { active: 'color:#22c55e', expired: 'color:#ef4444', paused: 'color:#eab308' }[k.status] || '';
+      const isOnline = _mgOnlineKeys.has((k.key || '').toUpperCase());
+      const dot = isOnline
+        ? `<span title="Online now" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;flex-shrink:0"></span>`
+        : `<span title="Offline" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#444;flex-shrink:0"></span>`;
       return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+        <td style="padding:8px 6px;width:18px">${dot}</td>
         <td style="padding:8px 6px;font-family:monospace;font-size:.75rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${k.key}">${k.key}</td>
         <td style="padding:8px 6px"><span style="background:rgba(232,88,34,.12);color:var(--accent);border-radius:999px;padding:2px 8px;font-size:.7rem;font-weight:700">${k.plan || 'falcao'}</span></td>
         <td style="padding:8px 6px;${sc};font-weight:600">${k.status}</td>
@@ -1175,7 +1191,7 @@ async function loadManageKeys(page) {
           </div>
         </td>
       </tr>`;
-    }).join('') : '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">No results</td></tr>';
+    }).join('') : '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted)">No results</td></tr>';
     const total = d.total || 0;
     const totalPages = Math.ceil(total / 20);
     const pag = document.getElementById('mgPagination');
