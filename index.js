@@ -997,6 +997,44 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "discord-key-bot-api" });
 });
 
+// ── HWID Reset approval via Discord interaction (webhook button) ──────────
+app.post("/api/hwid/action", async (req, res) => {
+  const { action, discordId, keyStr } = req.body || {};
+  if (!action || !discordId) return res.status(400).json({ ok: false });
+
+  const disc = discordClientRef;
+  const approved = action === 'approve';
+
+  if (approved && keyStr) {
+    try {
+      const db = readDb();
+      const found = getKeyRecord(db, keyStr);
+      if (found) {
+        found.hwid = null;
+        found.ip = null;
+        found.firstLoginAt = null;
+        writeDb(db);
+        appendKeyLog(dataDir, normalizeKey(keyStr), "hwid_reset", { by: "admin_via_request", discordId });
+      }
+    } catch (_) {}
+  }
+
+  // Send DM to user
+  try {
+    if (disc && disc.isReady()) {
+      const user = await disc.users.fetch(discordId).catch(() => null);
+      if (user) {
+        const msg = approved
+          ? `✅ **Your HWID reset request has been approved!**\nYour HWID has been cleared. You can now log in from a new device.`
+          : `❌ **Your HWID reset request has been rejected.**\nIf you think this is a mistake, contact an admin on Discord.`;
+        await user.send(msg).catch(() => {});
+      }
+    }
+  } catch (_) {}
+
+  res.json({ ok: true, approved });
+});
+
 function maskLicenseKey(key) {
   if (!key || key.length < 8) return key || "";
   return `${key.slice(0, 8)}****${key.slice(-4)}`;
@@ -2192,6 +2230,39 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   if (!interaction.isButton()) return;
+
+  // ── HWID Reset approve/reject ──────────────────────────────────────────
+  if (interaction.customId.startsWith("hwid_approve_") || interaction.customId.startsWith("hwid_reject_")) {
+    if (!hasRequiredRole(interaction.member)) {
+      await safeReply(interaction, { content: "You don't have permission to do this.", ephemeral: true });
+      return;
+    }
+    await safeDefer(interaction, true);
+    const isApprove = interaction.customId.startsWith("hwid_approve_");
+    // custom_id format: hwid_approve_DISCORDID_KEYSTR or hwid_reject_DISCORDID
+    const parts = interaction.customId.split("_");
+    const discordId = isApprove ? parts[2] : parts[2];
+    const keyStr = isApprove ? parts.slice(3).join("_") : null;
+    try {
+      await fetch(`http://localhost:${API_PORT}/api/hwid/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: isApprove ? "approve" : "reject", discordId, keyStr })
+      });
+      await interaction.editReply({
+        content: isApprove
+          ? `✅ HWID reset **approved** for <@${discordId}>. They have been notified via DM.`
+          : `❌ HWID reset **rejected** for <@${discordId}>. They have been notified via DM.`
+      });
+      // Disable buttons on original message
+      try {
+        await interaction.message.edit({ components: [] });
+      } catch (_) {}
+    } catch (e) {
+      await interaction.editReply({ content: `Error: ${e.message}` });
+    }
+    return;
+  }
 
   // ── PayPal admin confirm/reject buttons ────────────────────────────────
   if (interaction.customId.startsWith("paypal_confirm:") || interaction.customId.startsWith("paypal_reject:")) {
