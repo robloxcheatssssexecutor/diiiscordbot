@@ -9,7 +9,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent";
 
 const SYSTEM_PROMPT = `You are the official support agent for "Falcao External", a FiveM external cheat menu.
 
@@ -113,6 +113,7 @@ async function askGemini(history, userMessage) {
 
   if (!res.ok) {
     const err = await res.text().catch(() => "");
+    console.error("[ai-agent] Gemini error:", res.status, err.slice(0, 500));
     throw new Error(`Gemini API error ${res.status}: ${err.slice(0, 200)}`);
   }
 
@@ -156,7 +157,7 @@ function mountAiApi(app, deps) {
       res.json({ ok: true, reply, sessionId });
     } catch (e) {
       console.error("[ai-agent] chat error:", e.message);
-      res.status(500).json({ ok: false, message: "AI agent unavailable. Please try again." });
+      res.status(500).json({ ok: false, message: `AI error: ${e.message}` });
     }
   });
 
