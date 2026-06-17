@@ -409,11 +409,13 @@
       <!-- Dashboard inner tabs -->
       <div style="display:flex;gap:0;border-bottom:1px solid var(--stroke);margin-bottom:28px">
         <button class="dash-tab active" data-dtab="profile" onclick="dashTab('profile')">Profile</button>
+        <button class="dash-tab" data-dtab="panel" onclick="dashTab('panel')">Panel</button>
         <button class="dash-tab" data-dtab="settings" onclick="dashTab('settings')">Settings</button>
         <button class="dash-tab" data-dtab="referrals" onclick="dashTab('referrals')">Referrals</button>
         <button class="dash-tab" data-dtab="ai" onclick="dashTab('ai')">AI Agent</button>
       </div>
       <div id="dtab-profile" class="dtab-panel active"><div id="dashContent"></div></div>
+      <div id="dtab-panel" class="dtab-panel"><div id="panelContent"></div></div>
       <div id="dtab-settings" class="dtab-panel"><div id="settingsContent"></div></div>
       <div id="dtab-referrals" class="dtab-panel"><div id="referralsContent"></div></div>
       <div id="dtab-ai" class="dtab-panel"><div id="aiContent"></div></div>
@@ -456,6 +458,7 @@ function dashTab(tabId) {
   document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === tabId));
   document.querySelectorAll('.dtab-panel').forEach(p => p.classList.toggle('active', p.id === 'dtab-' + tabId));
   if (tabId === 'profile') renderDashboard();
+  if (tabId === 'panel') renderPanelTab();
   if (tabId === 'settings') renderSettings();
   if (tabId === 'referrals') renderReferrals();
   if (tabId === 'ai') renderAiChat();
@@ -1310,6 +1313,36 @@ function setPref(key, value, btn) {
   document.querySelectorAll(`#${key}Btns .pref-btn`).forEach(b => b.classList.remove('pref-active'));
   btn.classList.add('pref-active');
   if (key === 'currency') { pricesCache = null; const g = document.getElementById('purchaseGrid'); if (g) delete g.dataset.loaded; }
+}
+
+// ── PANEL TAB ──────────────────────────────────────────────────────────────
+function renderPanelTab() {
+  const ct = document.getElementById('panelContent');
+  if (!ct || ct.dataset.loaded) return;
+  ct.dataset.loaded = '1';
+  if (!currentUser) {
+    ct.innerHTML = `<div class="login-cta">
+      <h2>Sign in to access the Panel</h2>
+      <p>You need to be logged in to use the remote panel.</p>
+      <a class="btn-discord" href="/api/account/auth/login">Sign in with Discord</a>
+    </div>`;
+    return;
+  }
+  ct.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700">Remote Panel</h2>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px">Control your menu from here in real time.</p>
+      </div>
+      <a href="/panel" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none;
+        border:1px solid rgba(232,88,34,.3);padding:6px 13px;border-radius:8px;white-space:nowrap">
+        Open fullscreen ↗
+      </a>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--stroke);border-radius:14px;overflow:hidden">
+      <iframe src="/panel" style="width:100%;height:calc(100vh - 260px);min-height:500px;border:none;display:block"
+        title="Remote Panel" loading="lazy"></iframe>
+    </div>`;
 }
 
 // ── AI CHAT ────────────────────────────────────────────────────────────────
