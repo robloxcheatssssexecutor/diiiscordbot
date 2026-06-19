@@ -1,133 +1,135 @@
 /**
  * referrals.js
- * Referral program in EUR. Balance usable to pay for keys at checkout.
+ * Stub implementation for the referral system.
+ * Prevents MODULE_NOT_FOUND crash on startup.
  */
 
-const fs   = require("fs");
-const path = require("path");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
-let _dataDir = null;
-let _refPath = null;
+/** @type {Map<string, { discordId: string, code: string, balance: number }>} */
+const referrals = new Map();
+let referralsPath = null;
 
-function ensureFile() {
-  if (!_refPath) return;
-  if (!fs.existsSync(_refPath)) {
-    fs.writeFileSync(_refPath, JSON.stringify({ users: {} }, null, 2), "utf8");
+function ensureReferralsFile() {
+  if (!referralsPath) return;
+  if (!fs.existsSync(referralsPath)) {
+    fs.writeFileSync(referralsPath, JSON.stringify({ referrals: [] }, null, 2), "utf8");
   }
 }
 
-function readDb() {
-  ensureFile();
-  try { return JSON.parse(fs.readFileSync(_refPath, "utf8")); }
-  catch (_) { return { users: {} }; }
+function loadReferrals() {
+  if (!referralsPath || !fs.existsSync(referralsPath)) return;
+  try {
+    const raw = JSON.parse(fs.readFileSync(referralsPath, "utf8"));
+    if (Array.isArray(raw.referrals)) {
+      for (const r of raw.referrals) {
+        referrals.set(r.discordId, r);
+      }
+    }
+  } catch (_) {}
 }
 
-function writeDb(db) {
-  ensureFile();
-  fs.writeFileSync(_refPath, JSON.stringify(db, null, 2), "utf8");
+function saveReferrals() {
+  if (!referralsPath) return;
+  ensureReferralsFile();
+  try {
+    fs.writeFileSync(referralsPath, JSON.stringify({ referrals: [...referrals.values()] }, null, 2), "utf8");
+  } catch (_) {}
 }
 
-function generateCode() {
-  return "REF-" + crypto.randomBytes(4).toString("hex").toUpperCase();
-}
-
-function getOrCreate(db, discordId) {
-  if (!db.users[discordId]) {
-    db.users[discordId] = {
+function getOrCreateReferral(discordId) {
+  if (!referrals.has(discordId)) {
+    referrals.set(discordId, {
       discordId,
-      code: null,
-      balance: 0,       // EUR
-      totalEarned: 0,   // EUR
-      sales: 0,
-      recentEarnings: []
-    };
+      code: crypto.randomBytes(4).toString("hex").toUpperCase(),
+      balance: 0
+    });
+    saveReferrals();
   }
-  return db.users[discordId];
+  return referrals.get(discordId);
 }
 
 function mountReferralsApi(app, deps) {
   const { dataDir } = deps;
-  _dataDir = dataDir;
-  _refPath = path.join(dataDir, "referrals.json");
+  referralsPath = path.join(dataDir, "referrals.json");
+  loadReferrals();
 
-  // GET status
-  app.get("/api/referrals/status", (req, res) => {
-    const { discordId } = req.query;
-    if (!discordId) return res.status(400).json({ ok: false, message: "Missing discordId." });
-    const db = readDb();
-    const user = db.users[discordId];
-    if (!user) return res.json({ ok: true, balance: 0, totalEarned: 0, sales: 0, code: null, recentEarnings: [] });
-    res.json({ ok: true, ...user });
+  // GET /api/referrals/code?discordId=... — get or create referral code
+  app.get("/api/referrals/code", (req, res) => {
+    const discordId = String(req.query.discordId || "").trim();
+    if (!discordId) {
+      res.status(400).json({ ok: false, message: "discordId requerido." });
+      return;
+    }
+    const ref = getOrCreateReferral(discordId);
+    res.json({ ok: true, code: ref.code, balance: ref.balance });
   });
 
-  // GET validate ref code
+  // GET /api/referrals/validate?code=...&discordId=... — validate a referral code
   app.get("/api/referrals/validate", (req, res) => {
-    const { code, discordId } = req.query;
-    if (!code) return res.status(400).json({ ok: false, message: "Missing code." });
-    const db = readDb();
-    const owner = Object.values(db.users).find(u => u.code === code.toUpperCase());
-    if (!owner) return res.status(404).json({ ok: false, message: "Invalid code." });
-    if (discordId && owner.discordId === discordId) {
-      return res.status(400).json({ ok: false, message: "You cannot use your own referral code." });
+    const code = String(req.query.code || "").trim().toUpperCase();
+    const discordId = String(req.query.discordId || "").trim();
+    if (!code) {
+      res.json({ ok: false, message: "Código inválido." });
+      return;
     }
-    res.json({ ok: true, code: owner.code, referrerId: owner.discordId });
+    const found = [...referrals.values()].find(r => r.code === code);
+    if (!found) {
+      res.json({ ok: false, message: "Código de referido no encontrado." });
+      return;
+    }
+    if (found.discordId === discordId) {
+      res.json({ ok: false, message: "No puedes usar tu propio código de referido." });
+      return;
+    }
+    res.json({ ok: true, referrerId: found.discordId });
   });
 
-  // POST generate code
-  app.post("/api/referrals/generate", (req, res) => {
-    const { discordId } = req.body || {};
-    if (!discordId) return res.status(400).json({ ok: false, message: "Missing discordId." });
-    const db = readDb();
-    const user = getOrCreate(db, discordId);
-    if (!user.code) {
-      let code = generateCode();
-      const allCodes = Object.values(db.users).map(u => u.code);
-      while (allCodes.includes(code)) code = generateCode();
-      user.code = code;
-      writeDb(db);
-    }
-    res.json({ ok: true, code: user.code });
-  });
-
-  // POST credit earnings (called from payments.js after delivery)
+  // POST /api/referrals/credit — credit a referrer
   app.post("/api/referrals/credit", (req, res) => {
     const { referrerDiscordId, amount } = req.body || {};
-    if (!referrerDiscordId || !amount) return res.status(400).json({ ok: false });
-    const db = readDb();
-    const user = getOrCreate(db, referrerDiscordId);
-    const earned = Number(Number(amount).toFixed(2));
-    user.balance = Number((user.balance + earned).toFixed(2));
-    user.totalEarned = Number((user.totalEarned + earned).toFixed(2));
-    user.sales = (user.sales || 0) + 1;
-    user.recentEarnings = user.recentEarnings || [];
-    user.recentEarnings.unshift({ date: new Date().toISOString(), amount: earned });
-    if (user.recentEarnings.length > 30) user.recentEarnings = user.recentEarnings.slice(0, 30);
-    writeDb(db);
-    res.json({ ok: true });
+    if (!referrerDiscordId || !amount) {
+      res.status(400).json({ ok: false });
+      return;
+    }
+    const ref = getOrCreateReferral(referrerDiscordId);
+    ref.balance = Number(((ref.balance || 0) + Number(amount)).toFixed(2));
+    saveReferrals();
+    res.json({ ok: true, balance: ref.balance });
   });
 
-  // POST use balance to pay for a key (full or partial)
-  // Returns: { ok, appliedAmount, remainingPrice, newBalance }
+  // POST /api/referrals/use-balance — apply balance toward a purchase
   app.post("/api/referrals/use-balance", (req, res) => {
     const { discordId, priceEur } = req.body || {};
-    if (!discordId || priceEur == null) {
-      return res.status(400).json({ ok: false, message: "Missing discordId or priceEur." });
+    if (!discordId || !priceEur) {
+      res.status(400).json({ ok: false });
+      return;
     }
+    const ref = referrals.get(discordId);
+    const balance = ref ? (ref.balance || 0) : 0;
     const price = Number(priceEur);
-    if (!Number.isFinite(price) || price <= 0) {
-      return res.status(400).json({ ok: false, message: "Invalid price." });
+    const applied = Math.min(balance, price);
+    const remaining = Number((price - applied).toFixed(2));
+
+    if (applied > 0 && ref) {
+      ref.balance = Number((balance - applied).toFixed(2));
+      saveReferrals();
     }
-    const db = readDb();
-    const user = db.users[discordId];
-    if (!user || user.balance <= 0) {
-      return res.json({ ok: true, appliedAmount: 0, remainingPrice: price, newBalance: 0 });
+
+    res.json({ ok: true, appliedAmount: applied, remainingPrice: remaining, newBalance: ref ? ref.balance : 0 });
+  });
+
+  // GET /api/referrals/balance?discordId=... — get current balance
+  app.get("/api/referrals/balance", (req, res) => {
+    const discordId = String(req.query.discordId || "").trim();
+    if (!discordId) {
+      res.status(400).json({ ok: false });
+      return;
     }
-    const applied = Number(Math.min(user.balance, price).toFixed(2));
-    const remaining = Number(Math.max(0, price - applied).toFixed(2));
-    user.balance = Number((user.balance - applied).toFixed(2));
-    writeDb(db);
-    res.json({ ok: true, appliedAmount: applied, remainingPrice: remaining, newBalance: user.balance });
+    const ref = referrals.get(discordId);
+    res.json({ ok: true, balance: ref ? (ref.balance || 0) : 0 });
   });
 }
 

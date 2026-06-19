@@ -104,35 +104,38 @@ async function notifyAdminPayPalPending(order) {
   const disc = getDiscordClient();
   if (disc && disc.isReady()) {
     try {
-      // Parse channel ID from the webhook URL
-      const whParts = ADMIN_DISCORD_WH.split("/");
-      const channelId = whParts[whParts.length - 2];
-      const channel = await disc.channels.fetch(channelId).catch(() => null);
-      if (channel && channel.isTextBased()) {
-        const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
-        const embed = new EmbedBuilder()
-          .setColor(0xf6a800)
-          .setTitle("💰 Pago PayPal pendiente de verificación")
-          .addFields(
-            { name: "Usuario", value: `${order.discordUsername} (<@${order.discordId}>)`, inline: true },
-            { name: "Plan", value: `${order.plan} · ${order.durationDays} días`, inline: true },
-            { name: "Precio", value: `€${order.priceEur}`, inline: true },
-            { name: "Email PayPal", value: `\`${PAYPAL_EMAIL}\``, inline: true },
-            { name: "Order ID", value: `\`${order.orderId}\``, inline: true }
-          )
-          .setDescription("El cliente dice que ya ha pagado. Verifica en tu cuenta PayPal y pulsa el botón correspondiente.");
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`paypal_confirm:${order.orderId}`)
-            .setLabel("✅ Confirmar pago y entregar key")
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId(`paypal_reject:${order.orderId}`)
-            .setLabel("❌ Rechazar pago")
-            .setStyle(ButtonStyle.Danger)
-        );
-        await channel.send({ embeds: [embed], components: [row] });
-        return;
+      // Use a dedicated env var for the admin notification channel.
+      // Webhook URLs cannot be parsed for a channel ID — the second-to-last
+      // segment is the webhook ID, not a channel ID.
+      const channelId = process.env.PAYMENT_NOTIFY_CHANNEL_ID || "";
+      if (channelId) {
+        const channel = await disc.channels.fetch(channelId).catch(() => null);
+        if (channel && channel.isTextBased()) {
+          const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
+          const embed = new EmbedBuilder()
+            .setColor(0xf6a800)
+            .setTitle("💰 Pago PayPal pendiente de verificación")
+            .addFields(
+              { name: "Usuario", value: `${order.discordUsername} (<@${order.discordId}>)`, inline: true },
+              { name: "Plan", value: `${order.plan} · ${order.durationDays} días`, inline: true },
+              { name: "Precio", value: `€${order.priceEur}`, inline: true },
+              { name: "Email PayPal", value: `\`${PAYPAL_EMAIL}\``, inline: true },
+              { name: "Order ID", value: `\`${order.orderId}\``, inline: true }
+            )
+            .setDescription("El cliente dice que ya ha pagado. Verifica en tu cuenta PayPal y pulsa el botón correspondiente.");
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`paypal_confirm:${order.orderId}`)
+              .setLabel("✅ Confirmar pago y entregar key")
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+              .setCustomId(`paypal_reject:${order.orderId}`)
+              .setLabel("❌ Rechazar pago")
+              .setStyle(ButtonStyle.Danger)
+          );
+          await channel.send({ embeds: [embed], components: [row] });
+          return;
+        }
       }
     } catch (err) {
       console.error("[payments] Could not send PayPal notification via bot:", err.message);
@@ -643,7 +646,7 @@ function mountPaymentsApi(app, deps) {
 
     try {
       if (method === "ltc") {
-        const ltcAmount = await getEurToLtc(priceEur);
+        const ltcAmount = await getEurToLtc(finalPrice);
         if (!ltcAmount) {
           res.status(503).json({ ok: false, message: "No se pudo obtener el precio en LTC. Inténtalo de nuevo." });
           return;
@@ -731,16 +734,42 @@ function mountPaymentsApi(app, deps) {
     const sig = req.headers["stripe-signature"];
     let event;
     if (STRIPE_WEBHOOK_SECRET && sig) {
-      // Verify signature (requires raw body — express.json() breaks this)
-      // Raw body handled below
+      // Verify Stripe signature using the raw body captured before express.json()
       try {
         const payload = req.rawBody || "";
+        // Stripe signature format: t=<timestamp>,v1=<hmac>
+        const parts = sig.split(",").reduce((acc, part) => {
+          const [k, v] = part.split("=");
+          acc[k] = v;
+          return acc;
+        }, {});
+        const timestamp = parts.t;
+        const v1Sig = parts.v1;
+        if (!timestamp || !v1Sig) {
+          console.warn("[stripe-webhook] Invalid signature format");
+          res.status(400).json({ error: "Invalid signature format" });
+          return;
+        }
+        const signedPayload = `${timestamp}.${payload}`;
         const hmac = crypto.createHmac("sha256", STRIPE_WEBHOOK_SECRET);
-        hmac.update(payload);
-        const expected = `sha256=${hmac.digest("hex")}`;
-        // simplified — proper sig check needs timestamp
-        // For production use the official stripe library
-      } catch (_) {}
+        hmac.update(signedPayload);
+        const expected = hmac.digest("hex");
+        // Use timing-safe comparison to prevent timing attacks
+        const expectedBuf = Buffer.from(expected, "hex");
+        const receivedBuf = Buffer.from(v1Sig, "hex");
+        const sigValid =
+          expectedBuf.length === receivedBuf.length &&
+          crypto.timingSafeEqual(expectedBuf, receivedBuf);
+        if (!sigValid) {
+          console.warn("[stripe-webhook] Signature mismatch — ignoring event");
+          res.status(400).json({ error: "Signature verification failed" });
+          return;
+        }
+      } catch (sigErr) {
+        console.error("[stripe-webhook] Signature error:", sigErr.message);
+        res.status(400).json({ error: "Signature error" });
+        return;
+      }
     }
     try {
       event = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
@@ -859,9 +888,16 @@ function mountPaymentsApi(app, deps) {
   // ── POST /api/payments/admin/confirm — admin confirms PayPal ─────────────
   // Also called from Discord bot interaction
   app.post("/api/payments/admin/confirm", (req, res) => {
-    // Simple secret check
+    // Require a non-empty secret. If MENU_API_TOKEN is not configured,
+    // block ALL requests to prevent unauthorized key delivery.
+    const token = process.env.MENU_API_TOKEN || "";
+    if (!token) {
+      console.error("[payments] MENU_API_TOKEN not set — /api/payments/admin/confirm is disabled for security.");
+      res.status(503).json({ ok: false, message: "Admin confirm endpoint is disabled: MENU_API_TOKEN not configured." });
+      return;
+    }
     const secret = req.headers["x-admin-secret"] || "";
-    if (secret !== (process.env.MENU_API_TOKEN || "")) {
+    if (secret !== token) {
       res.status(401).json({ ok: false }); return;
     }
     const { orderId, action } = req.body || {};

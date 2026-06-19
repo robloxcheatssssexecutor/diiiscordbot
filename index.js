@@ -16,7 +16,7 @@ const {
 const { mountPanelApi } = require("./panel");
 const { mountManageApi } = require("./manage");
 const { mountAccountApi } = require("./account");
-const { appendKeyLog, mountKeyLogsApi } = require("./key-logs");
+const { appendKeyLog } = require("./key-logs");
 const { mountPaymentsApi, pendingOrders } = require("./payments");
 const { mountReferralsApi } = require("./referrals");
 const { chat: aiChat, mountAiApi } = require("./ai-agent");
@@ -45,6 +45,27 @@ const BUY_CHANNEL_LINK = "https://discord.com/channels/1502005944945741864/15020
 if (!TOKEN) {
   console.error("[discord] DISCORD_TOKEN no configurado — la web seguira activa pero el bot no arrancara.");
 }
+
+// ── Startup env var validation ────────────────────────────────────────────
+(function validateEnvVars() {
+  const warnings = [];
+  if (!process.env.DISCORD_CLIENT_SECRET)
+    warnings.push("DISCORD_CLIENT_SECRET — OAuth login (manage + account) fallará en runtime.");
+  if (!process.env.ADMIN_IDS)
+    warnings.push("ADMIN_IDS — nadie podrá iniciar sesión en el panel de gestión.");
+  if (!process.env.MENU_API_TOKEN)
+    warnings.push("MENU_API_TOKEN — el endpoint /api/payments/admin/confirm estará desactivado por seguridad.");
+  if (!process.env.STRIPE_SECRET_KEY)
+    warnings.push("STRIPE_SECRET_KEY — los pagos con Stripe fallarán.");
+  if (!process.env.STRIPE_WEBHOOK_SECRET)
+    warnings.push("STRIPE_WEBHOOK_SECRET — los webhooks de Stripe no se verificarán.");
+  if (!process.env.PAYMENT_NOTIFY_CHANNEL_ID)
+    warnings.push("PAYMENT_NOTIFY_CHANNEL_ID — las notificaciones de PayPal con botones no funcionarán (usará webhook fallback).");
+  if (warnings.length > 0) {
+    console.warn("[config] ADVERTENCIAS de configuración:");
+    for (const w of warnings) console.warn(`  ⚠️  ${w}`);
+  }
+})();
 
 function resolveDataDir() {
   const fromEnv = process.env.PERSISTENT_DATA_DIR || process.env.DATA_DIR;
@@ -333,7 +354,7 @@ function getWebPricesPayload() {
       lifetime: apply(product.lifetime)
     };
   }
-  return { products: out, offer: prices.offer, discountActive: discount > 0, discountPercent: discount };
+  return { products: out, offer: prices.offer, discountActive: discount > 0, discountPercent: discount, priceIncreaseActive: discount < 0 };
 }
 
 function writePrices(prices) {
@@ -357,7 +378,10 @@ function writePurchases(payload) {
 function getActiveDiscount(pricesPayload) {
   const now = Date.now();
   const endsAtMs = pricesPayload.offer?.endsAt ? new Date(pricesPayload.offer.endsAt).getTime() : 0;
-  const isActive = pricesPayload.offer?.discountPercent > 0 && Number.isFinite(endsAtMs) && endsAtMs > now;
+  // discountPercent > 0 = discount (price reduction), < 0 = price increase
+  const pct = pricesPayload.offer?.discountPercent;
+  const isActive = pct !== 0 && pct !== undefined && pct !== null &&
+    Number.isFinite(endsAtMs) && endsAtMs > now;
   if (!isActive) return 0;
   return pricesPayload.offer.discountPercent;
 }
@@ -766,6 +790,10 @@ async function logGeneral(clientInstance, title, fields = []) {
   await sendLogEmbed(clientInstance, LOG_CHANNEL_GENERAL_ID, embed);
 }
 
+// Declared here (before logError) so it is accessible when logError is called
+// during startup — before the Discord client is instantiated.
+const recentErrorFingerprints = new Map();
+
 async function logError(context, error, extra = {}) {
   const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   const stack = error instanceof Error && error.stack ? error.stack.slice(0, 1500) : "No stack";
@@ -787,11 +815,13 @@ async function logError(context, error, extra = {}) {
   }
   fields.push({ name: "Stack", value: `\`\`\`${stack}\`\`\``, inline: false });
   const embed = baseLogEmbed("Bot Error", 0xed4245).addFields(fields);
-  if (!client.isReady()) {
+  // Use discordClientRef which is set as soon as the client is created,
+  // avoiding a ReferenceError if logError is called before `client` is declared.
+  if (!discordClientRef || !discordClientRef.isReady()) {
     console.error(`[logError] ${context}: ${reason}`);
     return;
   }
-  await sendLogEmbed(client, LOG_CHANNEL_ERRORS_ID, embed);
+  await sendLogEmbed(discordClientRef, LOG_CHANNEL_ERRORS_ID, embed);
 }
 
 async function ensureTicketCategory(guild, categoryName) {
@@ -862,7 +892,6 @@ const TICKET_TYPES = {
 const buySelections = new Map();
 const buttonCooldowns = new Map();
 const suggestionVotes = new Map();
-const recentErrorFingerprints = new Map();
 
 function isOnCooldown(userId, key, cooldownMs = BUTTON_COOLDOWN_MS) {
   const now = Date.now();
@@ -942,16 +971,16 @@ function validateAndBindKey(db, key, hwid, ip, product, logDataDir) {
     found.ip = ip;
     found.key = normalizeKey(found.key);
     writeDb(db);
-    appendKeyLog(dataDir, normalizeKey(found.key), "first_login", { ip, hwid, product: product || "falcao" });
+    appendKeyLog(logDataDir, normalizeKey(found.key), "first_login", { ip, hwid, product: product || "falcao" });
     return { ok: true, message: "Primer login registrado. Key vinculada a HWID/IP.", key: found };
   }
 
   if (found.hwid !== hwid || found.ip !== ip) {
-    appendKeyLog(dataDir, normalizeKey(found.key), "login_rejected", { ip, hwid, reason: "hwid_ip_mismatch" });
+    appendKeyLog(logDataDir, normalizeKey(found.key), "login_rejected", { ip, hwid, reason: "hwid_ip_mismatch" });
     return { ok: false, message: "Acceso denegado: esta key ya esta vinculada a otro HWID/IP." };
   }
 
-  appendKeyLog(dataDir, normalizeKey(found.key), "login", { ip, hwid, product: product || "falcao" });
+  appendKeyLog(logDataDir, normalizeKey(found.key), "login", { ip, hwid, product: product || "falcao" });
   return { ok: true, message: "Key valida para este HWID/IP.", key: found };
 }
 
@@ -1001,6 +1030,14 @@ function createCopyButton(label, value) {
 }
 
 const app = express();
+// Raw body MUST be registered before express.json() so Stripe webhook
+// signature verification receives the unmodified body stream.
+app.use("/api/payments/stripe/webhook", (req, _res, next) => {
+  let data = "";
+  req.setEncoding("utf8");
+  req.on("data", chunk => { data += chunk; });
+  req.on("end", () => { req.rawBody = data; next(); });
+});
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -1235,14 +1272,6 @@ mountAccountApi(app, {
   normalizeKey,
   normalizePlan,
   loadersPath
-});
-
-// Raw body needed for Stripe webhook signature verification
-app.use("/api/payments/stripe/webhook", (req, _res, next) => {
-  let data = "";
-  req.setEncoding("utf8");
-  req.on("data", chunk => { data += chunk; });
-  req.on("end", () => { req.rawBody = data; next(); });
 });
 
 mountPaymentsApi(app, {
@@ -1540,9 +1569,6 @@ setInterval(async () => {
   }
 }, 60 * 1000);
 
-// Track which channels are ticket channels for AI responses
-const aiRespondedChannels = new Set();
-
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
@@ -1714,7 +1740,7 @@ client.on("interactionCreate", async (interaction) => {
         .setTitle("🎉🔥 **FALCAO EXTERNAL OFFER** 🔥🎉")
         .setThumbnail(PANEL_LOGO_URL)
         .setImage(PANEL_LOGO_URL)
-        .setDescription([`💸 **Disccount:** **${pricesPayload.offer.discountPercent}%**`, `⏳ **Time left:** <t:${endUnix}:R>`, "🚀 Take advantage of it now!"].join("\n"));
+        .setDescription([`💸 **Discount:** **${pricesPayload.offer.discountPercent}%**`, `⏳ **Time left:** <t:${endUnix}:R>`, "🚀 Take advantage of it now!"].join("\n"));
       await sendLogEmbed(client, OFFER_CHANNEL_ID, embed);
       await safeReply(interaction, { content: "Offer published." });
       return;
@@ -1776,7 +1802,7 @@ client.on("interactionCreate", async (interaction) => {
 
       const pricesPayload = readPrices();
       pricesPayload.offer = {
-        discountPercent: isDiscount ? absPct : -absPct, // negative = increase, positive = discount
+        discountPercent: isDiscount ? absPct : -absPct, // positive = discount (reduces price), negative = price increase
         durationText: durRaw,
         endsAt,
         expiredNotified: false,
@@ -2006,6 +2032,7 @@ client.on("interactionCreate", async (interaction) => {
       };
       db.keys.push(record);
       writeDb(db);
+      appendKeyLog(dataDir, normalizeKey(record.key), "created", { plan, durationDays: days, source: "slash_command" });
       const embed = new EmbedBuilder()
         .setColor(BRAND_ORANGE)
         .setTitle("FALCAO EXTERNAL • New Key")

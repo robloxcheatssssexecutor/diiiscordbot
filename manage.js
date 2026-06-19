@@ -181,13 +181,19 @@ function mountManageApi(app, deps) {
 
   // ── Auto-login to manage using account session ────────────────────────────
   app.post("/api/manage/auth/autologin", (req, res) => {
-    // Read account session cookie to get Discord ID
+    // Validate that the account session cookie is real by importing the
+    // account sessions Map directly — this prevents spoofing the discordId in body.
+    const { accountSessions } = require("./account");
     const accountCookie = parseCookies(req)["falcao_account_session"];
     if (!accountCookie) { res.status(401).json({ ok: false }); return; }
 
-    // We don't import account sessions here — check via the account status endpoint
-    // Instead, rely on the discordId passed in body (trusted because it came from account cookie)
-    const discordId = String(req.body?.discordId || "").trim();
+    const accountSession = accountSessions.get(accountCookie);
+    if (!accountSession || accountSession.expiresAt < Date.now()) {
+      res.status(401).json({ ok: false, message: "Sesión de cuenta inválida o expirada." });
+      return;
+    }
+
+    const discordId = accountSession.discordId;
     if (!discordId || !isAdminDiscordId(discordId)) {
       res.status(403).json({ ok: false, message: "No autorizado." });
       return;
@@ -331,7 +337,7 @@ function mountManageApi(app, deps) {
       (k.hwid && k.hwid.toUpperCase().includes(q)) ||
       (k.ip && k.ip.includes(q)) ||
       (k.claimedBy && k.claimedBy.includes(q)) ||
-      (k.claimedByUsername && k.claimedByUsername.toUpperCase().includes(q.toLowerCase ? q : q))
+      (k.claimedByUsername && k.claimedByUsername.toUpperCase().includes(q))
     );
     if (filterStatus) keys = keys.filter((k) => (k.status || "active") === filterStatus);
     keys.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
@@ -358,7 +364,6 @@ function mountManageApi(app, deps) {
 
   app.post("/api/manage/keys", (req, res) => {
     if (!requireManageAuth(req, res)) return;
-    const sess = requireManageAuth(req, res); // session already checked above
     const { days, plan } = req.body || {};
     const durationDays = Math.max(1, parseInt(days, 10) || 30);
     const normalizedPlan = normalizePlan(plan) || "falcao";
@@ -425,8 +430,9 @@ function mountManageApi(app, deps) {
     if (!ms || ms <= 0) { res.status(400).json({ ok: false, message: "Duracion invalida." }); return; }
     if (!found.expiresAt) { res.status(400).json({ ok: false, message: "Key sin fecha de expiracion." }); return; }
     const next = new Date(found.expiresAt).getTime() - ms;
-    found.expiresAt = new Date(Math.max(Date.now(), next)).toISOString();
-    if (new Date(found.expiresAt).getTime() <= Date.now()) found.status = "expired";
+    // Allow next to go below Date.now() so the key can actually be marked expired
+    found.expiresAt = new Date(next).toISOString();
+    if (next <= Date.now()) found.status = "expired";
     writeDb(db);
     if (logsDataDir) appendKeyLog(logsDataDir, target, "time_removed", { duration: req.body?.duration, newExpiresAt: found.expiresAt });
     res.json({ ok: true, expiresAt: found.expiresAt, status: found.status });

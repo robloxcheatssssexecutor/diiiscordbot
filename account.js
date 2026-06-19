@@ -185,7 +185,7 @@ function mountAccountApi(app, deps) {
         discordUsername: user.username || user.global_name || "Unknown",
         discordAvatar: user.avatar
           ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
-          : `https://cdn.discordapp.com/embed/avatars/${(BigInt(user.id) >> 22n) % 6n}.png`,
+          : `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(user.id) >> 22n) % 6}.png`,
         expiresAt: Date.now() + ACCOUNT_SESSION_TTL_MS
       });
       setAccountCookie(res, sessionToken, req);
@@ -443,6 +443,7 @@ async function handleAccountOAuthCallback(req, res, code, rawState) {
 
 module.exports = {
   mountAccountApi,
+  accountSessions,
   getLoadersMeta,
   saveLoadersMeta,
   getLoaderPath,

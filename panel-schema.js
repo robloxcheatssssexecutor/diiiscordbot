@@ -424,7 +424,6 @@ module.exports = {
           items: [
             item("menu_background_snow", "Fondo constelacion", "Constellation background"),
             item("hud_brand_watermark", "Marca de agua (logo + tiempo)", "Brand watermark (logo + time)"),
-            item("hud_crosshair", "Mira (crosshair)", "Crosshair"),
             item("ui_visual_quality", "Calidad visual", "Visual quality", "int", {
               min: 0,
               max: 2,
@@ -439,7 +438,6 @@ module.exports = {
           es: "Security",
           en: "Security",
           items: [
-            item("safe_mode", "Modo Seguro (bloquea exploits)", "Safe Mode"),
             item("captbypss", "Stream Proof", "Stream Proof"),
             item("gpu_capt_bypass", "Stream Proof Nvidia/AMD", "GPU Stream Proof"),
             item("second_monitor", "Modo Segundo Monitor", "Second Monitor"),
